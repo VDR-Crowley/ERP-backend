@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 class RefreshTokenTest extends TestCase
@@ -82,5 +83,30 @@ class RefreshTokenTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$login['access_token'])
             ->postJson('/api/refresh')
             ->assertForbidden();
+    }
+
+    public function test_missing_token_returns_clean_unauthorized_json(): void
+    {
+        $response = $this->postJson('/api/refresh');
+
+        $response->assertUnauthorized()
+            ->assertHeader('content-type', 'application/json')
+            ->assertJson(['message' => 'Unauthenticated.']);
+
+        $this->assertFalse($response->headers->has('Location'));
+    }
+
+    public function test_expired_refresh_token_is_rejected(): void
+    {
+        $login = $this->loginTokens();
+
+        // Refresh token válido tem TTL de 30 dias — simula ele já vencido
+        // direto no banco (sem esperar 30 dias de verdade).
+        PersonalAccessToken::findToken($login['refresh_token'])
+            ->update(['expires_at' => now()->subMinute()]);
+
+        $this->withHeader('Authorization', 'Bearer '.$login['refresh_token'])
+            ->postJson('/api/refresh')
+            ->assertUnauthorized();
     }
 }
