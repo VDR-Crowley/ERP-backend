@@ -15,15 +15,21 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('role')->default('ADMINISTRADOR');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
         });
 
+        // Fluxo próprio de reset por código de 6 dígitos (não o formato de
+        // link do PasswordBroker nativo). `expires_at` explícito em vez de
+        // calcular a partir de `created_at` + config.
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
+            $table->id();
+            $table->string('email')->index();
             $table->string('token');
+            $table->timestamp('expires_at');
             $table->timestamp('created_at')->nullable();
         });
 

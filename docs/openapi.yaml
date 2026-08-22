@@ -1,0 +1,442 @@
+openapi: 3.0.3
+info:
+  title: MiniERP API — Auth
+  description: >
+    Endpoints de autenticação (login, cadastro, reset de senha, refresh token)
+    do backend MiniERP. Sanctum com par de tokens: access token (2h) +
+    refresh token (30 dias, rotação a cada uso). Sem sessão/cookie — só
+    Bearer token.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8000/api
+    description: Dev local
+
+tags:
+  - name: Auth
+    description: Registro, login, logout e refresh de token
+  - name: Password Reset
+    description: Fluxo de redefinição de senha por código de 6 dígitos
+
+paths:
+  /register:
+    post:
+      tags: [Auth]
+      summary: Cadastrar novo usuário
+      description: >
+        Cria o usuário (role default `ADMINISTRADOR`) e já devolve um par de
+        tokens — login automático, sem etapa de confirmação de e-mail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuário criado e autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          description: Erro de validação (e-mail já cadastrado, senha não confere, campos obrigatórios)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                emailDuplicado:
+                  value:
+                    message: "The email has already been taken."
+                    errors:
+                      email: ["The email has already been taken."]
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Autenticar com e-mail e senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          description: Credenciais inválidas (mensagem genérica — não revela se o e-mail existe)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                credenciaisInvalidas:
+                  value:
+                    message: "E-mail ou senha inválidos."
+                    errors:
+                      email: ["E-mail ou senha inválidos."]
+        '429':
+          description: Rate limit excedido (throttle de login)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Encerrar a sessão atual
+      description: Revoga o par de tokens (access + refresh) da sessão do token usado na chamada.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Sessão encerrada, sem conteúdo de resposta
+        '401':
+          description: Token ausente, inválido, expirado ou já revogado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token autenticado mas sem ability `access` (ex., um refresh token usado aqui)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user:
+    get:
+      tags: [Auth]
+      summary: Dados do usuário autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Usuário autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Token ausente, inválido ou expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token autenticado mas sem ability `access`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /refresh:
+    post:
+      tags: [Auth]
+      summary: Rotacionar o par de tokens
+      description: >
+        Aceita só token com ability `refresh` (enviar o `refresh_token` no
+        header Authorization). Revoga o par atual e emite um par novo —
+        rotação, o refresh token usado nunca pode ser reaproveitado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Par de tokens novo emitido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Refresh token ausente, inválido, expirado ou já usado/revogado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token autenticado mas sem ability `refresh` (ex., um access token usado aqui)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /password/forgot:
+    post:
+      tags: [Password Reset]
+      summary: Solicitar código de redefinição de senha
+      description: >
+        Sempre responde 200 com mensagem genérica, exista ou não o e-mail
+        (evita user enumeration). Se existir, envia um código de 6 dígitos
+        por e-mail (válido por 15 minutos).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: usuario@exemplo.com
+      responses:
+        '200':
+          description: Solicitação processada (genérico, não revela se o e-mail existe)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                default:
+                  value:
+                    message: "Se o e-mail existir, enviamos um código de redefinição."
+        '422':
+          description: E-mail ausente ou em formato inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          description: Rate limit excedido (throttle de reset de senha)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /password/verify-code:
+    post:
+      tags: [Password Reset]
+      summary: Validar o código de 6 dígitos (sem consumir)
+      description: >
+        Confere e-mail + código sem invalidar o registro — usado no
+        passo 2→3 do wizard, antes do usuário digitar a nova senha.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+      responses:
+        '200':
+          description: Código válido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Código inválido ou expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                codigoInvalido:
+                  value:
+                    message: "Código inválido ou expirado."
+                    errors:
+                      code: ["Código inválido ou expirado."]
+        '429':
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /password/reset:
+    post:
+      tags: [Password Reset]
+      summary: Confirmar redefinição de senha
+      description: >
+        Confere e-mail + código de novo, troca a senha, consome o código e
+        revoga TODAS as sessões (todos os pares access+refresh, todos os
+        dispositivos) do usuário.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Senha redefinida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                default:
+                  value:
+                    message: "Senha redefinida com sucesso."
+        '422':
+          description: Código inválido/expirado, ou senha/confirmação inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "Sanctum personal access token — formato \"{id}|{texto-do-token}\". Enviar o access_token nas rotas normais e o refresh_token só em /refresh."
+      description: >
+        Todas as rotas protegidas exigem header `Authorization: Bearer <token>`.
+        O token deve ter a ability certa pra rota: `access` para as rotas
+        normais da API (/user, /logout), `refresh` só para /refresh. Usar o
+        token errado (ex. refresh token numa rota normal) resulta em 403.
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: minhasenha123
+        password_confirmation:
+          type: string
+          format: password
+          example: minhasenha123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          example: minhasenha123
+
+    VerifyCodeRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        code:
+          type: string
+          description: Código numérico de 6 dígitos enviado por e-mail
+          pattern: '^\d{6}$'
+          example: "482913"
+
+    ResetPasswordRequest:
+      type: object
+      required: [email, code, password, password_confirmation]
+      properties:
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          example: "482913"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: novaSenha456
+        password_confirmation:
+          type: string
+          format: password
+          example: novaSenha456
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        role:
+          type: string
+          example: ADMINISTRADOR
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-08-22T14:30:00.000000Z"
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token_type:
+          type: string
+          example: Bearer
+        access_token:
+          type: string
+          description: Token de acesso — usar nas rotas normais da API. Expira em 2 horas.
+          example: "1|abcdEFGhijkLMNopqrsTUVwxyz0123456789ABCD"
+        access_token_expires_at:
+          type: string
+          format: date-time
+          example: "2026-08-22T16:30:00.000000Z"
+        refresh_token:
+          type: string
+          description: Token de refresh — usar só em /refresh. Expira em 30 dias, rotacionado a cada uso.
+          example: "2|zyxWVUtsrqpONMlkjIHGfedcba9876543210dcba"
+        refresh_token_expires_at:
+          type: string
+          format: date-time
+          example: "2026-09-21T14:30:00.000000Z"
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string

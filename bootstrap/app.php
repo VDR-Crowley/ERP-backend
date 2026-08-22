@@ -4,6 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,6 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Backend API-only: nao existe rota web "login" para redirecionar
         // convidados nao autenticados. Sempre devolve 401 JSON.
         $middleware->redirectGuestsTo(fn () => null);
+
+        // Aliases do Sanctum p/ checar abilities dos tokens (access vs
+        // refresh) — nao vem registrado por padrao no pacote.
+        $middleware->alias([
+            'abilities' => CheckAbilities::class,
+            'ability' => CheckForAnyAbility::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
