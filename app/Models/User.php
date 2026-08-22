@@ -11,12 +11,20 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Único role existente hoje (ver planejamento). Espelha o default da
+     * coluna `role` na migration de `users` — mantido aqui também pra quem
+     * cria o registro em código (ex.: RegistrationService) não depender só
+     * do default do banco.
+     */
+    public const ROLE_ADMINISTRADOR = 'ADMINISTRADOR';
 
     /**
      * Get the attributes that should be cast.
