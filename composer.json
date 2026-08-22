@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "miniERP/erp-backend",
+    "name": "vandodosreis/erp-backend",
     "type": "project",
     "description": "MiniERP - API REST para gestao de granja (codorna/galinha). Backend em Laravel para o frontend Angular.",
     "keywords": ["laravel", "api", "miniERP"],
