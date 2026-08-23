@@ -29,6 +29,7 @@ class RegistrationService
             'email' => $data['email'],
             'password' => $data['password'],
             'role' => User::ROLE_ADMINISTRADOR,
+            'is_active' => true,
         ]);
 
         return ['user' => $user, ...$this->tokens->issuePairFor($user)];

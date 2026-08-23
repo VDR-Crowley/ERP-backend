@@ -40,6 +40,10 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::get('/user', [UserController::class, 'show']);
     Route::post('/logout', [LogoutController::class, 'store']);
 
+    // Administração de usuários (tela de admin do front) — diferente do
+    // cadastro público (`/register`). "Excluir" desativa, não apaga de verdade.
+    Route::apiResource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
+
     // Entidades core (ver docs/plano-entidades.md) — CRUD básico pronto;
     // ações especiais registradas como esqueleto (stub), lógica de negócio
     // fica pra próxima etapa.

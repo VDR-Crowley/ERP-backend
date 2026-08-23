@@ -18,6 +18,10 @@ tags:
     description: Registro, login, logout e refresh de token
   - name: Password Reset
     description: Fluxo de redefinição de senha por código de 6 dígitos
+  - name: Users
+    description: >
+      Administração de usuários pela tela de admin (diferente do cadastro
+      público `/register`) — "excluir" desativa, não apaga de verdade
   - name: Products
     description: Catálogo de produtos vendidos (ovos, embalagens etc.)
   - name: Vendedores
@@ -167,6 +171,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Listar usuários
+      description: Não paginado, mesmo padrão das outras entidades core.
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Users]
+      summary: Criar usuário
+      description: >
+        Fluxo de admin (diferente do cadastro público `/register`) — role
+        sempre `ADMINISTRADOR`, não é campo aceito no payload.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreUserRequest'
+      responses:
+        '201':
+          description: Usuário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{user}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [Users]
+      summary: Atualizar usuário
+      description: >
+        Senha opcional (só troca se enviada). `is_active` incluso — desativar
+        a própria conta é bloqueado (422).
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Erro de validação, incluindo tentativa de desativar a própria conta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+    patch:
+      tags: [Users]
+      summary: Atualizar usuário (parcial)
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Users]
+      summary: Desativar usuário
+      description: >
+        Não apaga de verdade — só marca `is_active=false`. Desativar a
+        própria conta é bloqueado (422).
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Usuário desativado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Tentativa de desativar a própria conta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
 
   /refresh:
     post:
@@ -1945,6 +2068,13 @@ components:
         normal) resulta em 403.
 
   parameters:
+    UserId:
+      name: user
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
     ProductId:
       name: product
       in: path
@@ -2152,10 +2282,61 @@ components:
         role:
           type: string
           example: ADMINISTRADOR
+        is_active:
+          type: boolean
+          example: true
         created_at:
           type: string
           format: date-time
           example: "2026-08-22T14:30:00.000000Z"
+
+    StoreUserRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: segredo6
+        password_confirmation:
+          type: string
+          format: password
+          example: segredo6
+
+    UpdateUserRequest:
+      type: object
+      required: [name, email]
+      description: >
+        `password`/`password_confirmation` opcionais — senha só troca se
+        enviada. `is_active=false` na própria conta logada retorna 422.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+        password_confirmation:
+          type: string
+          format: password
+        is_active:
+          type: boolean
+          example: true
 
     AuthTokenResponse:
       type: object
