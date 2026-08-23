@@ -4,9 +4,8 @@ Arquitetura "majestic monolith": 1 codebase, 3 services no Railway (App, Cron,
 Worker) + 1 plugin Postgres. Cada service builda a mesma imagem, mas roda um
 comando diferente.
 
-> Status: preparado na branch `feat/entidades-core` (PR #1, ainda não
-> mergeado em `main`). Nada aqui reflete em produção até o merge acontecer —
-> o Railway builda a partir da branch/commit configurado no projeto.
+> Status: PR #1 já mergeado em `main`. O Railway builda a partir da
+> branch/commit configurado no projeto.
 
 ## 0. Pré-requisito
 
@@ -34,6 +33,25 @@ Service principal, serve a API.
 - **Domínio público**: em **Settings → Networking → Generate Domain**. Só
   esse service precisa de domínio público; Cron e Worker não recebem tráfego
   HTTP.
+
+### 2.1 Versão do PHP no build
+
+O Nixpacks (builder padrão do Railway) detecta a versão do PHP lendo o campo
+`require.php` do `composer.json` — não existe variável de ambiente
+documentada pra isso (não é `NIXPACKS_PHP_VERSION` nem similar; se aparecer
+em algum lugar, não é mecanismo oficial do Nixpacks). O Nixpacks só
+disponibiliza os pacotes nix `php81`, `php82` (default), `php83` e `php84` —
+não existe `php85`.
+
+Hoje o `composer.json` declara `"php": "^8.4"`, exigido de verdade pelo
+`symfony/http-foundation` (e outros pacotes do Laravel 13) que pedem
+`>=8.4.1`. Isso já resolve o build sozinho — não precisa de `nixpacks.toml`
+nem de variável de ambiente manual no painel do Railway.
+
+Não confundir com o ambiente local: `composer.json` pode ficar em `^8.4` e
+seguir funcionando com o PHP 8.5.x local (Homebrew), já que `^8.4` aceita
+qualquer 8.4.x/8.5.x/etc. até a próxima major. Só o Nixpacks (que não tem
+`php85` disponível) fica travado no maior compatível, `php84`.
 
 ## 3. Cron Service
 
