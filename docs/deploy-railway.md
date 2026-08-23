@@ -62,9 +62,15 @@ Se um pacote precisa de uma extensão (ex.: `phpoffice/phpspreadsheet` exige
 precisa instalar e o build quebra com `ext-gd ... it is missing from your
 system`.
 
-Hoje `composer.json` declara `"ext-gd": "*"` por causa do
-`phpoffice/phpspreadsheet`. Se um pacote futuro exigir outra extensão
-(`ext-zip`, `ext-imagick`, etc.), declarar do mesmo jeito em `require`.
+Hoje `composer.json` declara todas as extensões que o
+`phpoffice/phpspreadsheet` exige de verdade (`ctype`, `dom`, `fileinfo`,
+`filter`, `gd`, `iconv`, `libxml`, `mbstring`, `simplexml`, `xml`,
+`xmlreader`, `xmlwriter`, `zip`, `zlib` — ver `composer show
+phpoffice/phpspreadsheet` pra lista completa de um pacote). Foi declarada
+uma de cada vez em builds anteriores (`gd`, depois `zip`) até declarar o
+conjunto inteiro de uma vez — pra evitar esse loop com um pacote novo,
+checar `composer show <pacote> | grep ext-` e declarar tudo que aparecer,
+não só a extensão do erro atual.
 
 ## 3. Cron Service
 
