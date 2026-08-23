@@ -88,6 +88,67 @@ class PasswordResetTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('code');
     }
 
+    public function test_forgot_password_rejects_malformed_email(): void
+    {
+        $response = $this->postJson('/api/password/forgot', ['email' => 'nao-e-um-email']);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
+    public function test_verify_code_rejects_missing_fields(): void
+    {
+        $response = $this->postJson('/api/password/verify-code', []);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['email', 'code']);
+    }
+
+    public function test_verify_code_rejects_code_with_wrong_number_of_digits(): void
+    {
+        $response = $this->postJson('/api/password/verify-code', [
+            'email' => 'reset2@example.com',
+            'code' => '123',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    public function test_reset_rejects_wrong_code_directly(): void
+    {
+        Notification::fake();
+
+        User::factory()->create(['email' => 'reset5@example.com']);
+
+        $this->postJson('/api/password/forgot', ['email' => 'reset5@example.com'])->assertOk();
+
+        $response = $this->postJson('/api/password/reset', [
+            'email' => 'reset5@example.com',
+            'code' => '000000',
+            'password' => 'nova-senha-6',
+            'password_confirmation' => 'nova-senha-6',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    public function test_reset_rejects_password_confirmation_mismatch(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create(['email' => 'reset6@example.com']);
+
+        $this->postJson('/api/password/forgot', ['email' => 'reset6@example.com'])->assertOk();
+        $code = $this->extractCodeFromNotification($user);
+
+        $response = $this->postJson('/api/password/reset', [
+            'email' => 'reset6@example.com',
+            'code' => $code,
+            'password' => 'nova-senha-6',
+            'password_confirmation' => 'outra-coisa',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('password');
+    }
+
     public function test_reset_revokes_all_existing_sessions(): void
     {
         Notification::fake();

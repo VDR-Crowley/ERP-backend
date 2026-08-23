@@ -22,7 +22,9 @@ class AuthService
     {
         $user = User::where('email', $email)->first();
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        // Mensagem genérica também pro caso de conta desativada — não revela
+        // pra quem tenta logar se a conta existe/está desativada.
+        if (! $user || ! Hash::check($password, $user->password) || ! $user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['E-mail ou senha inválidos.'],
             ]);

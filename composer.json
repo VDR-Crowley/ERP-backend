@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "miniERP/erp-backend",
+    "name": "vandodosreis/erp-backend",
     "type": "project",
     "description": "MiniERP - API REST para gestao de granja (codorna/galinha). Backend em Laravel para o frontend Angular.",
     "keywords": ["laravel", "api", "miniERP"],
@@ -9,7 +9,8 @@
         "php": "^8.3",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "phpoffice/phpspreadsheet": "^5.9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -42,6 +43,9 @@
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "@php artisan dev"
+        ],
+        "serve": [
+            "@php artisan serve"
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",

@@ -55,6 +55,34 @@ class LoginTest extends TestCase
         $response->assertUnprocessable()->assertJsonValidationErrors('email');
     }
 
+    public function test_rejects_missing_email(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'password' => 'qualquer',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
+    public function test_rejects_missing_password(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'email' => 'user@example.com',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('password');
+    }
+
+    public function test_rejects_malformed_email(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'email' => 'nao-e-um-email',
+            'password' => 'qualquer',
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
     public function test_access_token_authenticates_protected_route(): void
     {
         User::factory()->create([

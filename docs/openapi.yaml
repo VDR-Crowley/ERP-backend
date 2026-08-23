@@ -1,12 +1,14 @@
 openapi: 3.0.3
 info:
-  title: MiniERP API — Auth
+  title: MiniERP API
   description: >
-    Endpoints de autenticação (login, cadastro, reset de senha, refresh token)
-    do backend MiniERP. Sanctum com par de tokens: access token (2h) +
-    refresh token (30 dias, rotação a cada uso). Sem sessão/cookie — só
-    Bearer token.
-  version: "1.0.0"
+    Backend MiniERP: autenticação (login, cadastro, reset de senha, refresh
+    token) via Sanctum, mais as 17 entidades core (produtos, vendedores,
+    plantel, incubação, estoques, vendas, transferências, produção diária,
+    despesas, fluxo de caixa, ração, limpeza) e o relatório de Análise por
+    Linha de Negócio. Sanctum com par de tokens: access token (2h) + refresh
+    token (30 dias, rotação a cada uso). Sem sessão/cookie — só Bearer token.
+  version: "1.1.0"
 servers:
   - url: http://localhost:8000/api
     description: Dev local
@@ -16,6 +18,40 @@ tags:
     description: Registro, login, logout e refresh de token
   - name: Password Reset
     description: Fluxo de redefinição de senha por código de 6 dígitos
+  - name: Users
+    description: >
+      Administração de usuários pela tela de admin (diferente do cadastro
+      público `/register`) — "excluir" desativa, não apaga de verdade
+  - name: Products
+    description: Catálogo de produtos vendidos (ovos, embalagens etc.)
+  - name: Vendedores
+    description: Cadastro de vendedores/revendedores
+  - name: Flock
+    description: Plantel (lotes de aves em produção) — codorna/quail e galinha/chicken
+  - name: FlockIncubation
+    description: Lotes em incubação e os eventos de nascimento (hatch events)
+  - name: VendorStock
+    description: Estoque de produtos alocado por vendedor
+  - name: Sales
+    description: Vendas — baixam estoque automaticamente no local informado
+  - name: StockTransfers
+    description: Transferências de estoque entre Plantel e vendedores
+  - name: DailyProductions
+    description: Produção diária de ovos por espécie
+  - name: EggStocks
+    description: Estoque diário de ovos (unidades, bandejas e valor)
+  - name: Expenses
+    description: Despesas, com rateio por espécie via override manual
+  - name: CashFlows
+    description: Fluxo de caixa (entradas e saídas)
+  - name: FeedStocks
+    description: Estoque de ração — reposição e abertura de saco
+  - name: FeedOpenLogs
+    description: Histórico (somente leitura) de sacos de ração abertos
+  - name: FlockCleanings
+    description: Registros de limpeza do plantel
+  - name: BusinessLineReport
+    description: Relatório de Análise por Linha de Negócio (codorna x galinha)
 
 paths:
   /register:
@@ -135,6 +171,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Listar usuários
+      description: Não paginado, mesmo padrão das outras entidades core.
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Users]
+      summary: Criar usuário
+      description: >
+        Fluxo de admin (diferente do cadastro público `/register`) — role
+        sempre `ADMINISTRADOR`, não é campo aceito no payload.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreUserRequest'
+      responses:
+        '201':
+          description: Usuário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{user}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [Users]
+      summary: Atualizar usuário
+      description: >
+        Senha opcional (só troca se enviada). `is_active` incluso — desativar
+        a própria conta é bloqueado (422).
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Erro de validação, incluindo tentativa de desativar a própria conta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+    patch:
+      tags: [Users]
+      summary: Atualizar usuário (parcial)
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Users]
+      summary: Desativar usuário
+      description: >
+        Não apaga de verdade — só marca `is_active=false`. Desativar a
+        própria conta é bloqueado (422).
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Usuário desativado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Tentativa de desativar a própria conta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
 
   /refresh:
     post:
@@ -287,6 +442,1618 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ============================================================
+  # Products
+  # ============================================================
+  /products:
+    get:
+      tags: [Products]
+      summary: Listar produtos
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de produtos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Products]
+      summary: Criar produto
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Produto criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Erro de validação (ex. `name` duplicado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /products/{product}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Products]
+      summary: Detalhar produto
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Produto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Products]
+      summary: Atualizar produto
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Produto atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Products]
+      summary: Excluir produto
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Produto excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Vendedores
+  # ============================================================
+  /vendedores:
+    get:
+      tags: [Vendedores]
+      summary: Listar vendedores
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de vendedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendedor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Vendedores]
+      summary: Criar vendedor
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendedorRequest'
+      responses:
+        '201':
+          description: Vendedor criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendedor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /vendedores/{vendedor}:
+    parameters:
+      - $ref: '#/components/parameters/VendedorId'
+    get:
+      tags: [Vendedores]
+      summary: Detalhar vendedor
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Vendedor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendedor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Vendedores]
+      summary: Atualizar vendedor
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendedorRequest'
+      responses:
+        '200':
+          description: Vendedor atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendedor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Vendedores]
+      summary: Excluir vendedor
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Vendedor excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Flock (plantel)
+  # ============================================================
+  /flock:
+    get:
+      tags: [Flock]
+      summary: Listar lotes do plantel
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de lotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Flock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Flock]
+      summary: Criar lote do plantel
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlockRequest'
+      responses:
+        '201':
+          description: Lote criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /flock/{flock}:
+    parameters:
+      - $ref: '#/components/parameters/FlockId'
+    get:
+      tags: [Flock]
+      summary: Detalhar lote do plantel
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Flock]
+      summary: Atualizar lote do plantel
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlockRequest'
+      responses:
+        '200':
+          description: Lote atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Flock]
+      summary: Excluir lote do plantel
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Lote excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # FlockIncubation + hatch events
+  # ============================================================
+  /flock-incubations:
+    get:
+      tags: [FlockIncubation]
+      summary: Listar lotes em incubação
+      description: Cada lote vem com seus `hatch_events` carregados.
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de lotes em incubação
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FlockIncubation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [FlockIncubation]
+      summary: Criar lote em incubação
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreFlockIncubationRequest'
+      responses:
+        '201':
+          description: Lote em incubação criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockIncubation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /flock-incubations/{flock_incubation}:
+    parameters:
+      - $ref: '#/components/parameters/FlockIncubationId'
+    get:
+      tags: [FlockIncubation]
+      summary: Detalhar lote em incubação
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lote em incubação (com `hatch_events`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockIncubation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [FlockIncubation]
+      summary: Atualizar lote em incubação
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFlockIncubationRequest'
+      responses:
+        '200':
+          description: Lote atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockIncubation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [FlockIncubation]
+      summary: Excluir lote em incubação
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Lote excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /flock-incubations/{flock_incubation}/hatch-events:
+    parameters:
+      - $ref: '#/components/parameters/FlockIncubationId'
+    get:
+      tags: [FlockIncubation]
+      summary: Listar eventos de nascimento do lote
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de eventos de nascimento
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HatchEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [FlockIncubation]
+      summary: Registrar evento de nascimento
+      description: >
+        Cria o evento e recalcula o status do lote: se a soma de `count` de
+        todos os `hatch_events` atingir `egg_count`, o lote é fechado
+        automaticamente (`status` vira `eclodido`).
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HatchEventRequest'
+      responses:
+        '201':
+          description: Evento criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HatchEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /flock-incubations/{flock_incubation}/hatch-events/{hatch_event}:
+    parameters:
+      - $ref: '#/components/parameters/FlockIncubationId'
+      - $ref: '#/components/parameters/HatchEventId'
+    put:
+      tags: [FlockIncubation]
+      summary: Atualizar evento de nascimento
+      description: >
+        Atualiza o evento e reavalia o status do lote (mesma regra do
+        create). Um lote já `eclodido` nunca reabre sozinho — editar pra um
+        total menor não desfaz o fechamento.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HatchEventRequest'
+      responses:
+        '200':
+          description: Evento atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HatchEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Lote não encontrado, ou o evento não pertence a esse lote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [FlockIncubation]
+      summary: Excluir evento de nascimento
+      description: Remove o evento e reavalia o status do lote (mesma regra do create/update).
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Evento excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Lote não encontrado, ou o evento não pertence a esse lote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # VendorStock
+  # ============================================================
+  /vendor-stock:
+    get:
+      tags: [VendorStock]
+      summary: Listar estoque por vendedor
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de estoques por vendedor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VendorStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [VendorStock]
+      summary: Criar registro de estoque por vendedor
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorStockRequest'
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: >
+            Erro de validação — inclui o par (`product_id`, `vendedor_id`)
+            duplicado (já existe estoque desse produto pra esse vendedor)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /vendor-stock/{vendor_stock}:
+    parameters:
+      - $ref: '#/components/parameters/VendorStockId'
+    get:
+      tags: [VendorStock]
+      summary: Detalhar registro de estoque por vendedor
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [VendorStock]
+      summary: Atualizar registro de estoque por vendedor
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorStockRequest'
+      responses:
+        '200':
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [VendorStock]
+      summary: Excluir registro de estoque por vendedor
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Registro excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Sales
+  # ============================================================
+  /sales:
+    get:
+      tags: [Sales]
+      summary: Listar vendas
+      description: Cada venda vem com a `exclusion` carregada (se marcada como evento isolado).
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de vendas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sale'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Sales]
+      summary: Registrar venda
+      description: >
+        Cria a venda e baixa o estoque do produto no local informado
+        (`stock_location_type`/`stock_location_vendedor_id`: Plantel ou um
+        vendedor específico). Não bloqueia estoque negativo — mesmo
+        comportamento lenient do front.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleRequest'
+      responses:
+        '201':
+          description: Venda criada (estoque já baixado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: >
+            Erro de validação — inclui `stock_location_vendedor_id`
+            obrigatório quando `stock_location_type=vendedor` (e proibido
+            quando `stock_location_type=plantel`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /sales/{sale}:
+    parameters:
+      - $ref: '#/components/parameters/SaleId'
+    get:
+      tags: [Sales]
+      summary: Detalhar venda
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Venda (com `exclusion`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Sales]
+      summary: Atualizar venda
+      description: >
+        Desfaz a baixa de estoque antiga e aplica a nova — mesmo se produto,
+        local ou quantidade mudaram.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleRequest'
+      responses:
+        '200':
+          description: Venda atualizada (estoque reajustado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Sales]
+      summary: Excluir venda
+      description: Devolve ao local de origem a quantidade que havia sido baixada por essa venda.
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Venda excluída (estoque devolvido)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sales/{sale}/exclusion:
+    parameters:
+      - $ref: '#/components/parameters/SaleId'
+    post:
+      tags: [Sales]
+      summary: Marcar venda como evento isolado
+      description: >
+        Marca a venda como "evento isolado" — fica de fora da Análise por
+        Linha de Negócio. Idempotente: chamar de novo atualiza o `reason`
+        (`updateOrCreate`).
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleExclusionRequest'
+      responses:
+        '201':
+          description: Venda marcada como evento isolado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleExclusion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Sales]
+      summary: Desmarcar venda como evento isolado
+      description: Remove a exclusão — a venda volta a entrar na Análise por Linha de Negócio.
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Exclusão removida
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # StockTransfers
+  # ============================================================
+  /stock-transfers:
+    get:
+      tags: [StockTransfers]
+      summary: Listar transferências de estoque
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de transferências
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockTransfer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [StockTransfers]
+      summary: Criar transferência de estoque
+      description: >
+        Move a quantidade do local de origem pro de destino. Diferente da
+        venda, aqui é exigido saldo suficiente no local de origem — decisão
+        de endurecer a regra no backend (o front é lenient e nunca bloqueia
+        estoque negativo).
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockTransferRequest'
+      responses:
+        '201':
+          description: Transferência criada (estoque movido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTransfer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: >
+            Erro de validação — inclui **saldo insuficiente** no local de
+            origem (`quantity`: "Saldo insuficiente no local de origem
+            (disponível: N).") e **origem igual ao destino**
+            (`to_location_type`: "O destino da transferência não pode ser
+            igual à origem.")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                saldoInsuficiente:
+                  value:
+                    message: "The given data was invalid."
+                    errors:
+                      quantity: ["Saldo insuficiente no local de origem (disponível: 3)."]
+                origemIgualDestino:
+                  value:
+                    message: "The given data was invalid."
+                    errors:
+                      to_location_type: ["O destino da transferência não pode ser igual à origem."]
+
+  /stock-transfers/{stock_transfer}:
+    parameters:
+      - $ref: '#/components/parameters/StockTransferId'
+    get:
+      tags: [StockTransfers]
+      summary: Detalhar transferência de estoque
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Transferência
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTransfer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [StockTransfers]
+      summary: Atualizar transferência de estoque
+      description: Desfaz o movimento antigo antes de validar saldo e aplicar o novo.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockTransferRequest'
+      responses:
+        '200':
+          description: Transferência atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTransfer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Mesmas regras de negócio do create (saldo insuficiente / origem igual ao destino)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+    delete:
+      tags: [StockTransfers]
+      summary: Excluir transferência de estoque
+      description: Reverte o movimento — devolve a quantidade à origem e retira do destino.
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Transferência excluída (estoque revertido)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # DailyProductions
+  # ============================================================
+  /daily-productions:
+    get:
+      tags: [DailyProductions]
+      summary: Listar produção diária
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de registros de produção diária
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyProduction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [DailyProductions]
+      summary: Registrar produção diária
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyProductionRequest'
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyProduction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Erro de validação (ex. já existe registro pra essa `date`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /daily-productions/{daily_production}:
+    parameters:
+      - $ref: '#/components/parameters/DailyProductionId'
+    get:
+      tags: [DailyProductions]
+      summary: Detalhar registro de produção diária
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyProduction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [DailyProductions]
+      summary: Atualizar registro de produção diária
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyProductionRequest'
+      responses:
+        '200':
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyProduction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [DailyProductions]
+      summary: Excluir registro de produção diária
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Registro excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # EggStocks
+  # ============================================================
+  /egg-stocks:
+    get:
+      tags: [EggStocks]
+      summary: Listar estoque diário de ovos
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de registros de estoque de ovos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EggStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [EggStocks]
+      summary: Registrar estoque diário de ovos
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EggStockRequest'
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EggStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Erro de validação (ex. já existe registro pra essa `date`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /egg-stocks/{egg_stock}:
+    parameters:
+      - $ref: '#/components/parameters/EggStockId'
+    get:
+      tags: [EggStocks]
+      summary: Detalhar registro de estoque de ovos
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EggStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [EggStocks]
+      summary: Atualizar registro de estoque de ovos
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EggStockRequest'
+      responses:
+        '200':
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EggStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [EggStocks]
+      summary: Excluir registro de estoque de ovos
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Registro excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Expenses
+  # ============================================================
+  /expenses:
+    get:
+      tags: [Expenses]
+      summary: Listar despesas
+      description: Cada despesa vem com o `species_override` carregado (se houver).
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de despesas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Expenses]
+      summary: Registrar despesa
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseRequest'
+      responses:
+        '201':
+          description: Despesa criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /expenses/{expense}:
+    parameters:
+      - $ref: '#/components/parameters/ExpenseId'
+    get:
+      tags: [Expenses]
+      summary: Detalhar despesa
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Despesa (com `species_override`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Expenses]
+      summary: Atualizar despesa
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseRequest'
+      responses:
+        '200':
+          description: Despesa atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Expenses]
+      summary: Excluir despesa
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Despesa excluída
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /expenses/{expense}/species-override:
+    parameters:
+      - $ref: '#/components/parameters/ExpenseId'
+    post:
+      tags: [Expenses]
+      summary: Sobrescrever espécie da despesa
+      description: >
+        Sobrescreve manualmente a espécie que consumiu a despesa (usado na
+        Análise por Linha de Negócio, quando a detecção automática por texto
+        na descrição falha ou é ambígua). Idempotente (`updateOrCreate`).
+        `species: null` força rateio proporcional ao plantel, sem atribuir a
+        uma espécie única.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseSpeciesOverrideRequest'
+      responses:
+        '201':
+          description: Override criado/atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseSpeciesOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Expenses]
+      summary: Remover override de espécie
+      description: Remove o override — a despesa volta pra detecção automática por texto na descrição.
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Override removido
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # CashFlows
+  # ============================================================
+  /cash-flows:
+    get:
+      tags: [CashFlows]
+      summary: Listar fluxo de caixa
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de lançamentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CashFlow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [CashFlows]
+      summary: Registrar lançamento de caixa
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CashFlowRequest'
+      responses:
+        '201':
+          description: Lançamento criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashFlow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /cash-flows/{cash_flow}:
+    parameters:
+      - $ref: '#/components/parameters/CashFlowId'
+    get:
+      tags: [CashFlows]
+      summary: Detalhar lançamento de caixa
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lançamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashFlow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [CashFlows]
+      summary: Atualizar lançamento de caixa
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CashFlowRequest'
+      responses:
+        '200':
+          description: Lançamento atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashFlow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [CashFlows]
+      summary: Excluir lançamento de caixa
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Lançamento excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # FeedStocks
+  # ============================================================
+  /feed-stocks:
+    get:
+      tags: [FeedStocks]
+      summary: Listar estoque de ração
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de tipos de ração em estoque
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [FeedStocks]
+      summary: Criar tipo de ração em estoque
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedStockRequest'
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Erro de validação (ex. `type` duplicado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /feed-stocks/{feed_stock}:
+    parameters:
+      - $ref: '#/components/parameters/FeedStockId'
+    get:
+      tags: [FeedStocks]
+      summary: Detalhar tipo de ração em estoque
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [FeedStocks]
+      summary: Atualizar tipo de ração em estoque
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedStockRequest'
+      responses:
+        '200':
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [FeedStocks]
+      summary: Excluir tipo de ração em estoque
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Registro excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /feed-stocks/{feed_stock}/replenish:
+    parameters:
+      - $ref: '#/components/parameters/FeedStockId'
+    post:
+      tags: [FeedStocks]
+      summary: Repor estoque de ração
+      description: >
+        Soma `bags`/`bags * bag_weight_kg` ao saldo (`bags_in_stock`/
+        `kg_in_stock`) e troca `last_bag_weight_kg`/`expiration_date` pros
+        valores da remessa reposta.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplenishFeedStockRequest'
+      responses:
+        '200':
+          description: Estoque reposto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /feed-stocks/{feed_stock}/open-bag:
+    parameters:
+      - $ref: '#/components/parameters/FeedStockId'
+    post:
+      tags: [FeedStocks]
+      summary: Abrir saco de ração
+      description: >
+        Decrementa 1 saco e `weight_kg` do saldo (`bags_in_stock`/
+        `kg_in_stock`; não altera `last_bag_weight_kg`) e registra o
+        `feed_open_logs` correspondente.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenFeedStockBagRequest'
+      responses:
+        '200':
+          description: Saco aberto (estoque decrementado e log registrado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedStock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # FeedOpenLogs (somente leitura)
+  # ============================================================
+  /feed-open-logs:
+    get:
+      tags: [FeedOpenLogs]
+      summary: Listar histórico de sacos abertos
+      description: Somente leitura — o log é criado via `POST /feed-stocks/{feed_stock}/open-bag`.
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de logs de abertura de saco
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedOpenLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # FlockCleanings
+  # ============================================================
+  /flock-cleanings:
+    get:
+      tags: [FlockCleanings]
+      summary: Listar limpezas do plantel
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Lista de registros de limpeza
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FlockCleaning'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [FlockCleanings]
+      summary: Registrar limpeza do plantel
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlockCleaningRequest'
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockCleaning'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /flock-cleanings/{flock_cleaning}:
+    parameters:
+      - $ref: '#/components/parameters/FlockCleaningId'
+    get:
+      tags: [FlockCleanings]
+      summary: Detalhar registro de limpeza
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockCleaning'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [FlockCleanings]
+      summary: Atualizar registro de limpeza
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlockCleaningRequest'
+      responses:
+        '200':
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlockCleaning'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [FlockCleanings]
+      summary: Excluir registro de limpeza
+      security: [{bearerAuth: []}]
+      responses:
+        '204':
+          description: Registro excluído
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # BusinessLineReport
+  # ============================================================
+  /business-line-report:
+    get:
+      tags: [BusinessLineReport]
+      summary: Relatório de Análise por Linha de Negócio
+      description: >
+        Compara codorna/quail x galinha/chicken (receita, custo, lucro,
+        margem), montado a partir de `sales` (excluindo as marcadas em
+        `sale_exclusions`), `expenses` (respeitando
+        `expense_species_overrides`), `flock` e `products`. Período opcional
+        via `start`/`end` — sem os dois, considera todo o histórico.
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: start
+          in: query
+          required: false
+          description: Data inicial do período (inclusive)
+          schema:
+            type: string
+            format: date
+            example: "2026-01-01"
+        - name: end
+          in: query
+          required: false
+          description: Data final do período (inclusive). Deve ser >= `start`.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-31"
+      responses:
+        '200':
+          description: Relatório montado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessLineReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: "`end` anterior a `start`, ou datas em formato inválido"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -296,8 +2063,136 @@ components:
       description: >
         Todas as rotas protegidas exigem header `Authorization: Bearer <token>`.
         O token deve ter a ability certa pra rota: `access` para as rotas
-        normais da API (/user, /logout), `refresh` só para /refresh. Usar o
-        token errado (ex. refresh token numa rota normal) resulta em 403.
+        normais da API (todas as rotas de entidades, /user, /logout), `refresh`
+        só para /refresh. Usar o token errado (ex. refresh token numa rota
+        normal) resulta em 403.
+
+  parameters:
+    UserId:
+      name: user
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    ProductId:
+      name: product
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    VendedorId:
+      name: vendedor
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    FlockId:
+      name: flock
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    FlockIncubationId:
+      name: flock_incubation
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    HatchEventId:
+      name: hatch_event
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    VendorStockId:
+      name: vendor_stock
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    SaleId:
+      name: sale
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    StockTransferId:
+      name: stock_transfer
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    DailyProductionId:
+      name: daily_production
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    EggStockId:
+      name: egg_stock
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    ExpenseId:
+      name: expense
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    CashFlowId:
+      name: cash_flow
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    FeedStockId:
+      name: feed_stock
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    FlockCleaningId:
+      name: flock_cleaning
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Erro de validação
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
 
   schemas:
     RegisterRequest:
@@ -387,10 +2282,61 @@ components:
         role:
           type: string
           example: ADMINISTRADOR
+        is_active:
+          type: boolean
+          example: true
         created_at:
           type: string
           format: date-time
           example: "2026-08-22T14:30:00.000000Z"
+
+    StoreUserRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: segredo6
+        password_confirmation:
+          type: string
+          format: password
+          example: segredo6
+
+    UpdateUserRequest:
+      type: object
+      required: [name, email]
+      description: >
+        `password`/`password_confirmation` opcionais — senha só troca se
+        enviada. `is_active=false` na própria conta logada retorna 422.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Maria da Silva
+        email:
+          type: string
+          format: email
+          example: maria@exemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+        password_confirmation:
+          type: string
+          format: password
+        is_active:
+          type: boolean
+          example: true
 
     AuthTokenResponse:
       type: object
@@ -440,3 +2386,1132 @@ components:
             type: array
             items:
               type: string
+
+    # ------------------------------------------------------------
+    # Products
+    # ------------------------------------------------------------
+    ProductRequest:
+      type: object
+      required: [name, unit, unit_price, stock, eggs_per_unit]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Único no cadastro (`unique:products,name`, ignorando o próprio registro no update)
+          example: Bandeja de ovos de codorna
+        unit:
+          type: string
+          maxLength: 255
+          example: bandeja
+        unit_price:
+          type: number
+          format: float
+          minimum: 0
+          example: 12.5
+        stock:
+          type: integer
+          minimum: 0
+          example: 100
+        eggs_per_unit:
+          type: integer
+          minimum: 0
+          example: 30
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Bandeja de ovos de codorna
+        unit:
+          type: string
+          example: bandeja
+        unit_price:
+          type: string
+          description: Decimal (2 casas), serializado como string pelo cast do Eloquent
+          example: "12.50"
+        stock:
+          type: integer
+          example: 100
+        eggs_per_unit:
+          type: integer
+          example: 30
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # Vendedores
+    # ------------------------------------------------------------
+    VendedorRequest:
+      type: object
+      required: [name, active]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: João Distribuidor
+        contact:
+          type: string
+          maxLength: 255
+          nullable: true
+          example: "(11) 99999-0000"
+        active:
+          type: boolean
+          example: true
+
+    Vendedor:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: João Distribuidor
+        contact:
+          type: string
+          nullable: true
+          example: "(11) 99999-0000"
+        active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # Flock
+    # ------------------------------------------------------------
+    FlockRequest:
+      type: object
+      required: [species, quantity, feed_bags_per_month, bag_price, monthly_total]
+      properties:
+        species:
+          type: string
+          maxLength: 255
+          description: Texto livre (não restrito a `quail`/`chicken` como nas outras entidades)
+          example: Codorna
+        quantity:
+          type: integer
+          minimum: 0
+          example: 500
+        feed_bags_per_month:
+          type: integer
+          minimum: 0
+          example: 10
+        bag_price:
+          type: number
+          format: float
+          minimum: 0
+          example: 90.0
+        monthly_total:
+          type: number
+          format: float
+          minimum: 0
+          example: 900.0
+
+    Flock:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        species:
+          type: string
+          example: Codorna
+        quantity:
+          type: integer
+          example: 500
+        feed_bags_per_month:
+          type: integer
+          example: 10
+        bag_price:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "90.00"
+        monthly_total:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "900.00"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # FlockIncubation + HatchEvent
+    # ------------------------------------------------------------
+    StoreFlockIncubationRequest:
+      type: object
+      required: [start_date, species, egg_count, expected_hatch_date]
+      properties:
+        start_date:
+          type: string
+          format: date
+          example: "2026-08-01"
+        species:
+          type: string
+          enum: [quail, chicken]
+          example: quail
+        egg_count:
+          type: integer
+          minimum: 1
+          example: 50
+        expected_hatch_date:
+          type: string
+          format: date
+          example: "2026-08-19"
+        status:
+          type: string
+          enum: [incubando, eclodido]
+          description: Opcional na criação — assume o default da coluna quando omitido
+          example: incubando
+        egg_cost:
+          type: number
+          format: float
+          minimum: 0
+          nullable: true
+          example: 25.0
+        feed_cost:
+          type: number
+          format: float
+          minimum: 0
+          nullable: true
+          example: 10.0
+        notes:
+          type: string
+          nullable: true
+
+    UpdateFlockIncubationRequest:
+      allOf:
+        - $ref: '#/components/schemas/StoreFlockIncubationRequest'
+        - type: object
+          required: [start_date, species, egg_count, expected_hatch_date, status]
+          description: Igual ao create, mas `status` é obrigatório na atualização.
+
+    FlockIncubation:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        start_date:
+          type: string
+          format: date
+        species:
+          type: string
+          enum: [quail, chicken]
+        egg_count:
+          type: integer
+          example: 50
+        expected_hatch_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [incubando, eclodido]
+        egg_cost:
+          type: string
+          nullable: true
+          description: Decimal (2 casas), serializado como string
+        feed_cost:
+          type: string
+          nullable: true
+          description: Decimal (2 casas), serializado como string
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        hatch_events:
+          type: array
+          description: Carregado em index/show
+          items:
+            $ref: '#/components/schemas/HatchEvent'
+
+    HatchEventRequest:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-19"
+        count:
+          type: integer
+          minimum: 1
+          example: 45
+        notes:
+          type: string
+          maxLength: 255
+          nullable: true
+
+    HatchEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        flock_incubation_id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+          example: 45
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # VendorStock
+    # ------------------------------------------------------------
+    VendorStockRequest:
+      type: object
+      required: [product_id, vendedor_id, quantity]
+      properties:
+        product_id:
+          type: integer
+          description: Deve existir em `products`
+          example: 1
+        vendedor_id:
+          type: integer
+          description: >
+            Deve existir em `vendedores`. Par (`product_id`, `vendedor_id`)
+            único — não pode haver dois registros de estoque do mesmo
+            produto pro mesmo vendedor.
+          example: 1
+        quantity:
+          type: integer
+          minimum: 0
+          example: 20
+
+    VendorStock:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        product_id:
+          type: integer
+          example: 1
+        vendedor_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 20
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # Sales
+    # ------------------------------------------------------------
+    SaleRequest:
+      type: object
+      required:
+        - date
+        - product_id
+        - quantity
+        - unit_price
+        - total
+        - payment_pending
+        - buyer
+        - seller_id
+        - delivery_pending
+        - stock_location_type
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        product_id:
+          type: integer
+          description: Deve existir em `products`
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 5
+        unit_price:
+          type: number
+          format: float
+          minimum: 0
+          example: 12.5
+        total:
+          type: number
+          format: float
+          minimum: 0
+          example: 62.5
+        payment_pending:
+          type: boolean
+          example: false
+        buyer:
+          type: string
+          maxLength: 255
+          example: Maria Compradora
+        seller_id:
+          type: integer
+          description: Deve existir em `vendedores`
+          example: 1
+        delivery_pending:
+          type: boolean
+          example: false
+        delivery_date:
+          type: string
+          format: date
+          nullable: true
+        stock_location_type:
+          type: string
+          enum: [plantel, vendedor]
+          description: Local de onde o estoque é baixado
+          example: plantel
+        stock_location_vendedor_id:
+          type: integer
+          nullable: true
+          description: >
+            Obrigatório e deve existir em `vendedores` quando
+            `stock_location_type=vendedor`; proibido (deve vir ausente/null)
+            quando `stock_location_type=plantel`.
+          example: null
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        product_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 5
+        unit_price:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "12.50"
+        total:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "62.50"
+        payment_pending:
+          type: boolean
+        buyer:
+          type: string
+          example: Maria Compradora
+        seller_id:
+          type: integer
+          example: 1
+        delivery_pending:
+          type: boolean
+        delivery_date:
+          type: string
+          format: date
+          nullable: true
+        stock_location_type:
+          type: string
+          enum: [plantel, vendedor]
+        stock_location_vendedor_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        exclusion:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/SaleExclusion'
+          description: Carregado em index/show — presente só quando a venda está marcada como evento isolado
+
+    SaleExclusionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          example: Venda de teste, não representa faturamento real
+
+    SaleExclusion:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sale_id:
+          type: integer
+          example: 1
+        reason:
+          type: string
+          example: Venda de teste, não representa faturamento real
+        created_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # StockTransfers
+    # ------------------------------------------------------------
+    StockTransferRequest:
+      type: object
+      required: [date, product_id, quantity, from_location_type, to_location_type]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        product_id:
+          type: integer
+          description: Deve existir em `products`
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 10
+        from_location_type:
+          type: string
+          enum: [plantel, vendedor]
+          example: plantel
+        from_vendedor_id:
+          type: integer
+          nullable: true
+          description: >
+            Obrigatório quando `from_location_type=vendedor`, proibido
+            quando `from_location_type=plantel`
+          example: null
+        to_location_type:
+          type: string
+          enum: [plantel, vendedor]
+          example: vendedor
+        to_vendedor_id:
+          type: integer
+          nullable: true
+          description: >
+            Obrigatório quando `to_location_type=vendedor`, proibido quando
+            `to_location_type=plantel`. Origem e destino não podem apontar
+            pro mesmo local (mesma validação em `withValidator`).
+          example: 1
+        note:
+          type: string
+          nullable: true
+
+    StockTransfer:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        product_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 10
+        from_location_type:
+          type: string
+          enum: [plantel, vendedor]
+        from_vendedor_id:
+          type: integer
+          nullable: true
+        to_location_type:
+          type: string
+          enum: [plantel, vendedor]
+        to_vendedor_id:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # DailyProductions
+    # ------------------------------------------------------------
+    DailyProductionRequest:
+      type: object
+      required: [date]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Único (`unique:daily_productions,date`, ignorando o próprio registro no update)
+          example: "2026-08-20"
+        quail_eggs:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 120
+        chicken_eggs:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 30
+
+    DailyProduction:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        quail_eggs:
+          type: integer
+          nullable: true
+          example: 120
+        chicken_eggs:
+          type: integer
+          nullable: true
+          example: 30
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # EggStocks
+    # ------------------------------------------------------------
+    EggStockRequest:
+      type: object
+      required: [date, quail_packs, chicken_packs, quail_stock_value, chicken_stock_value]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Único (`unique:egg_stocks,date`, ignorando o próprio registro no update)
+          example: "2026-08-20"
+        quail_eggs:
+          type: integer
+          minimum: 0
+          nullable: true
+        chicken_eggs:
+          type: integer
+          minimum: 0
+          nullable: true
+        quail_packs:
+          type: number
+          format: float
+          minimum: 0
+          example: 10.0
+        chicken_packs:
+          type: number
+          format: float
+          minimum: 0
+          example: 3.0
+        quail_stock_value:
+          type: number
+          format: float
+          minimum: 0
+          example: 150.0
+        chicken_stock_value:
+          type: number
+          format: float
+          minimum: 0
+          example: 90.0
+
+    EggStock:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        quail_eggs:
+          type: integer
+          nullable: true
+        chicken_eggs:
+          type: integer
+          nullable: true
+        quail_packs:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "10.00"
+        chicken_packs:
+          type: string
+          example: "3.00"
+        quail_stock_value:
+          type: string
+          example: "150.00"
+        chicken_stock_value:
+          type: string
+          example: "90.00"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # Expenses
+    # ------------------------------------------------------------
+    ExpenseRequest:
+      type: object
+      required: [date, description, category, amount, paid]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        description:
+          type: string
+          maxLength: 255
+          example: Ração para codornas
+        category:
+          type: string
+          maxLength: 255
+          example: Alimentação
+        quantity:
+          type: integer
+          minimum: 0
+          nullable: true
+        unit_price:
+          type: number
+          format: float
+          minimum: 0
+          nullable: true
+        amount:
+          type: number
+          format: float
+          minimum: 0
+          example: 250.0
+        paid:
+          type: boolean
+          example: true
+
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          example: Ração para codornas
+        category:
+          type: string
+          example: Alimentação
+        quantity:
+          type: integer
+          nullable: true
+        unit_price:
+          type: string
+          nullable: true
+          description: Decimal (2 casas), serializado como string
+        amount:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "250.00"
+        paid:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        species_override:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ExpenseSpeciesOverride'
+          description: Carregado em index/show — presente só quando há override manual
+
+    ExpenseSpeciesOverrideRequest:
+      type: object
+      required: [reason]
+      properties:
+        species:
+          type: string
+          enum: [quail, chicken]
+          nullable: true
+          description: "`null` força rateio proporcional ao plantel, sem atribuir a uma espécie única"
+          example: quail
+        reason:
+          type: string
+          example: Despesa 100% da criação de codornas
+
+    ExpenseSpeciesOverride:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        expense_id:
+          type: integer
+          example: 1
+        species:
+          type: string
+          enum: [quail, chicken]
+          nullable: true
+        reason:
+          type: string
+          example: Despesa 100% da criação de codornas
+        created_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # CashFlows
+    # ------------------------------------------------------------
+    CashFlowRequest:
+      type: object
+      required: [date, description, inflow, amount]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        description:
+          type: string
+          maxLength: 255
+          example: Venda de ovos
+        inflow:
+          type: boolean
+          description: "`true` = entrada, `false` = saída"
+          example: true
+        amount:
+          type: number
+          format: float
+          minimum: 0
+          example: 300.0
+
+    CashFlow:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          example: Venda de ovos
+        inflow:
+          type: boolean
+        amount:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "300.00"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # FeedStocks
+    # ------------------------------------------------------------
+    FeedStockRequest:
+      type: object
+      required: [type, bags_in_stock, kg_in_stock, last_bag_weight_kg]
+      properties:
+        type:
+          type: string
+          maxLength: 255
+          description: Único (`unique:feed_stocks,type`, ignorando o próprio registro no update)
+          example: Ração inicial
+        bags_in_stock:
+          type: integer
+          minimum: 0
+          example: 20
+        kg_in_stock:
+          type: number
+          format: float
+          minimum: 0
+          example: 500.0
+        last_bag_weight_kg:
+          type: number
+          format: float
+          minimum: 0
+          example: 25.0
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+
+    FeedStock:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        type:
+          type: string
+          example: Ração inicial
+        bags_in_stock:
+          type: integer
+          example: 20
+        kg_in_stock:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "500.00"
+        last_bag_weight_kg:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "25.00"
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ReplenishFeedStockRequest:
+      type: object
+      required: [bags, bag_weight_kg, expiration_date]
+      properties:
+        bags:
+          type: integer
+          minimum: 1
+          example: 10
+        bag_weight_kg:
+          type: number
+          format: float
+          minimum: 0.01
+          example: 25.0
+        expiration_date:
+          type: string
+          format: date
+          example: "2027-02-01"
+
+    OpenFeedStockBagRequest:
+      type: object
+      required: [date, weight_kg]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        weight_kg:
+          type: number
+          format: float
+          minimum: 0.01
+          example: 25.0
+
+    FeedOpenLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        feed_stock_id:
+          type: integer
+          example: 1
+        feed_type:
+          type: string
+          description: Cópia de `feed_stocks.type` no momento da abertura
+          example: Ração inicial
+        date:
+          type: string
+          format: date
+        weight_kg:
+          type: string
+          description: Decimal (2 casas), serializado como string
+          example: "25.00"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # FlockCleanings
+    # ------------------------------------------------------------
+    FlockCleaningRequest:
+      type: object
+      required: [date, species, cleaning_type]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-08-20"
+        species:
+          type: string
+          enum: [quail, chicken]
+          example: quail
+        cleaning_type:
+          type: string
+          enum: [total, feeder, tray, nest]
+          example: total
+        notes:
+          type: string
+          nullable: true
+
+    FlockCleaning:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        species:
+          type: string
+          enum: [quail, chicken]
+        cleaning_type:
+          type: string
+          enum: [total, feeder, tray, nest]
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # BusinessLineReport
+    # ------------------------------------------------------------
+    SpeciesTotals:
+      type: object
+      properties:
+        revenue:
+          type: number
+          format: float
+          example: 5200.0
+        cost:
+          type: number
+          format: float
+          example: 3100.0
+        profit:
+          type: number
+          format: float
+          example: 2100.0
+        margin_pct:
+          type: number
+          format: float
+          description: "`0` quando `revenue` é 0"
+          example: 40.38
+
+    BusinessLineReportProductEntry:
+      type: object
+      description: Ordenado por `margin_pct` (pior primeiro)
+      properties:
+        name:
+          type: string
+          example: Bandeja de ovos de codorna
+        revenue:
+          type: number
+          format: float
+          example: 3200.0
+        cost:
+          type: number
+          format: float
+          example: 1900.0
+        profit:
+          type: number
+          format: float
+          example: 1300.0
+        margin_pct:
+          type: number
+          format: float
+          example: 40.62
+        quantity_sold:
+          type: integer
+          example: 64
+
+    BusinessLineReportMonthlyEntry:
+      type: object
+      description: Só meses com venda real aparecem
+      properties:
+        month:
+          type: string
+          description: "Formato `YYYY-MM`"
+          example: "2026-08"
+        quail_revenue:
+          type: number
+          format: float
+          example: 3200.0
+        chicken_revenue:
+          type: number
+          format: float
+          example: 2000.0
+
+    BusinessLineReport:
+      type: object
+      properties:
+        by_species:
+          type: object
+          properties:
+            quail:
+              $ref: '#/components/schemas/SpeciesTotals'
+            chicken:
+              $ref: '#/components/schemas/SpeciesTotals'
+            chicken_covers_costs:
+              type: boolean
+              description: "`true` quando o lucro da galinha (`chicken.profit`) é >= 0"
+              example: true
+            difference_covered_by_quail:
+              type: number
+              format: float
+              description: "`0` quando `chicken_covers_costs` é `true`; senão, o valor absoluto do prejuízo da galinha"
+              example: 0.0
+        by_product:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessLineReportProductEntry'
+        monthly_series:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessLineReportMonthlyEntry'
