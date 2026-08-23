@@ -53,6 +53,19 @@ seguir funcionando com o PHP 8.5.x local (Homebrew), já que `^8.4` aceita
 qualquer 8.4.x/8.5.x/etc. até a próxima major. Só o Nixpacks (que não tem
 `php85` disponível) fica travado no maior compatível, `php84`.
 
+### 2.2 Extensões PHP no build
+
+O mesmo mecanismo do `require.php` vale pra extensões: o Nixpacks lê chaves
+`ext-*` do `composer.json` e provisiona a extensão correspondente no build.
+Se um pacote precisa de uma extensão (ex.: `phpoffice/phpspreadsheet` exige
+`ext-gd`) e ela não está declarada em `require`, o Nixpacks não sabe que
+precisa instalar e o build quebra com `ext-gd ... it is missing from your
+system`.
+
+Hoje `composer.json` declara `"ext-gd": "*"` por causa do
+`phpoffice/phpspreadsheet`. Se um pacote futuro exigir outra extensão
+(`ext-zip`, `ext-imagick`, etc.), declarar do mesmo jeito em `require`.
+
 ## 3. Cron Service
 
 Roda o scheduler do Laravel (`php artisan schedule:run`) a cada minuto.
