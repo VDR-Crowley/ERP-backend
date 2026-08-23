@@ -9,12 +9,15 @@ use App\Http\Requests\HatchEvent\StoreHatchEventRequest;
 use App\Http\Requests\HatchEvent\UpdateHatchEventRequest;
 use App\Models\FlockIncubation;
 use App\Models\HatchEvent;
+use App\Services\HatchEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class FlockIncubationController extends Controller
 {
+    public function __construct(private readonly HatchEventService $hatchEvents) {}
+
     public function index(): JsonResponse
     {
         return response()->json(FlockIncubation::with('hatchEvents')->get());
@@ -46,23 +49,20 @@ class FlockIncubationController extends Controller
         return response()->noContent();
     }
 
-    /**
-     * Histórico de nascimentos do lote — CRUD ainda sem a regra de fechar o
-     * lote automaticamente (`deriveStatusAfterHatchChange`), que fica pra
-     * próxima etapa.
-     */
     public function hatchEvents(FlockIncubation $flockIncubation): JsonResponse
     {
         return response()->json($flockIncubation->hatchEvents);
     }
 
+    /** Registra o nascimento e fecha o lote ("eclodido") automaticamente se a soma atingir `egg_count`. */
     public function storeHatchEvent(StoreHatchEventRequest $request, FlockIncubation $flockIncubation): JsonResponse
     {
-        $hatchEvent = $flockIncubation->hatchEvents()->create($request->validated());
+        $hatchEvent = $this->hatchEvents->create($flockIncubation, $request->validated());
 
         return response()->json($hatchEvent, Response::HTTP_CREATED);
     }
 
+    /** Reavalia o status do lote depois da edição (nunca reabre um lote já "eclodido"). */
     public function updateHatchEvent(
         UpdateHatchEventRequest $request,
         FlockIncubation $flockIncubation,
@@ -70,16 +70,17 @@ class FlockIncubationController extends Controller
     ): JsonResponse {
         $this->assertBelongsToLote($flockIncubation, $hatchEvent);
 
-        $hatchEvent->update($request->validated());
+        $hatchEvent = $this->hatchEvents->update($flockIncubation, $hatchEvent, $request->validated());
 
         return response()->json($hatchEvent);
     }
 
+    /** Reavalia o status do lote depois da remoção (nunca reabre um lote já "eclodido"). */
     public function destroyHatchEvent(FlockIncubation $flockIncubation, HatchEvent $hatchEvent): Response
     {
         $this->assertBelongsToLote($flockIncubation, $hatchEvent);
 
-        $hatchEvent->delete();
+        $this->hatchEvents->delete($flockIncubation, $hatchEvent);
 
         return response()->noContent();
     }

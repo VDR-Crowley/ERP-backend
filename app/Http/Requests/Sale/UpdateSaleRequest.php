@@ -28,7 +28,11 @@ class UpdateSaleRequest extends FormRequest
             'delivery_pending' => ['required', 'boolean'],
             'delivery_date' => ['nullable', 'date'],
             'stock_location_type' => ['required', 'in:plantel,vendedor'],
-            'stock_location_vendedor_id' => ['nullable', 'integer', 'exists:vendedores,id'],
+            'stock_location_vendedor_id' => [
+                'required_if:stock_location_type,vendedor',
+                'prohibited_if:stock_location_type,plantel',
+                'nullable', 'integer', 'exists:vendedores,id',
+            ],
         ];
     }
 }

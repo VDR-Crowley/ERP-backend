@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Auth\LogoutController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\Auth\RegisterController;
+use App\Http\Controllers\Api\BusinessLineReportController;
 use App\Http\Controllers\Api\CashFlowController;
 use App\Http\Controllers\Api\DailyProductionController;
 use App\Http\Controllers\Api\EggStockController;
@@ -75,4 +76,6 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::get('feed-open-logs', [FeedOpenLogController::class, 'index']);
 
     Route::apiResource('flock-cleanings', FlockCleaningController::class);
+
+    Route::get('business-line-report', [BusinessLineReportController::class, 'show']);
 });

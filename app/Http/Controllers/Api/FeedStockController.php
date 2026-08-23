@@ -3,14 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FeedStock\OpenFeedStockBagRequest;
+use App\Http\Requests\FeedStock\ReplenishFeedStockRequest;
 use App\Http\Requests\FeedStock\StoreFeedStockRequest;
 use App\Http\Requests\FeedStock\UpdateFeedStockRequest;
 use App\Models\FeedStock;
+use App\Services\FeedStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 
 class FeedStockController extends Controller
 {
+    public function __construct(private readonly FeedStockService $feedStocks) {}
+
     public function index(): JsonResponse
     {
         return response()->json(FeedStock::all());
@@ -42,21 +47,19 @@ class FeedStockController extends Controller
         return response()->noContent();
     }
 
-    /**
-     * Esqueleto: reposição de sacos (recalcular bags_in_stock/kg_in_stock,
-     * trocar validade) fica pra próxima etapa (lógica de negócio).
-     */
-    public function replenish(FeedStock $feedStock): JsonResponse
+    /** Soma sacos/kg repostos e atualiza o peso de referência do saco pro da remessa reposta. */
+    public function replenish(ReplenishFeedStockRequest $request, FeedStock $feedStock): JsonResponse
     {
-        return response()->json(['message' => 'Reposição de ração ainda não implementada.'], Response::HTTP_NOT_IMPLEMENTED);
+        $feedStock = $this->feedStocks->replenish($feedStock, $request->validated());
+
+        return response()->json($feedStock);
     }
 
-    /**
-     * Esqueleto: abrir saco deveria criar um `feed_open_logs` e abater do
-     * saldo do tipo — fica pra próxima etapa (lógica de negócio).
-     */
-    public function openBag(FeedStock $feedStock): JsonResponse
+    /** Decrementa 1 saco/peso do saldo e registra o `feed_open_logs` correspondente. */
+    public function openBag(OpenFeedStockBagRequest $request, FeedStock $feedStock): JsonResponse
     {
-        return response()->json(['message' => 'Abertura de saco ainda não implementada.'], Response::HTTP_NOT_IMPLEMENTED);
+        $feedStock = $this->feedStocks->openBag($feedStock, $request->validated());
+
+        return response()->json($feedStock);
     }
 }

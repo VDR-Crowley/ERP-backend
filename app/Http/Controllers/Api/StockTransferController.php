@@ -6,19 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StockTransfer\StoreStockTransferRequest;
 use App\Http\Requests\StockTransfer\UpdateStockTransferRequest;
 use App\Models\StockTransfer;
+use App\Services\StockTransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 
 class StockTransferController extends Controller
 {
+    public function __construct(private readonly StockTransferService $transfers) {}
+
     public function index(): JsonResponse
     {
         return response()->json(StockTransfer::all());
     }
 
+    /** Move a quantidade do local de origem pro de destino (exige saldo suficiente na origem). */
     public function store(StoreStockTransferRequest $request): JsonResponse
     {
-        $stockTransfer = StockTransfer::create($request->validated());
+        $stockTransfer = $this->transfers->create($request->validated());
 
         return response()->json($stockTransfer, Response::HTTP_CREATED);
     }
@@ -30,14 +34,14 @@ class StockTransferController extends Controller
 
     public function update(UpdateStockTransferRequest $request, StockTransfer $stockTransfer): JsonResponse
     {
-        $stockTransfer->update($request->validated());
+        $stockTransfer = $this->transfers->update($stockTransfer, $request->validated());
 
         return response()->json($stockTransfer);
     }
 
     public function destroy(StockTransfer $stockTransfer): Response
     {
-        $stockTransfer->delete();
+        $this->transfers->delete($stockTransfer);
 
         return response()->noContent();
     }
