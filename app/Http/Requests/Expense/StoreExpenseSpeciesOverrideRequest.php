@@ -17,7 +17,7 @@ class StoreExpenseSpeciesOverrideRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'species' => ['nullable', 'in:codorna,galinha'],
+            'species' => ['nullable', 'in:quail,chicken'],
             'reason' => ['required', 'string'],
         ];
     }

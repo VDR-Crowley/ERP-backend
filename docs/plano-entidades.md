@@ -11,16 +11,20 @@ cruzadas com cada entidade abaixo).
 calculadas em cima das entidades reais (confirmado lendo os componentes — nenhuma delas lê de
 um `IDB_STORES.dashboard` ou equivalente com dado próprio).
 
-## Observação sobre `species` (3 vocabulários distintos no front — preservados como estão)
+## Observação sobre `species` (RESOLVIDO — unificado em inglês)
 
-O front usa três representações diferentes pra "espécie", sem unificação:
-- `flock.species`: string livre (rótulo real do usuário, ex. `"Galinhas Embrapa 051"`).
-- `flockIncubation.species` / `flockCleaning.species`: enum `'quail' | 'chicken'` (inglês).
-- `expenseSpeciesOverride.species` / regra de rateio (`business-line-report.util.ts`): enum
-  `'codorna' | 'galinha'` (português).
+O front usa três representações diferentes pra "espécie". Decisão tomada: padronizar todo
+enum/valor armazenado ou comparado no backend em **inglês** (`quail`/`chicken`). Texto em
+português é só camada de exibição (label, tradução pontual no front), nunca valor persistido
+ou comparado no código de backend.
 
-Mantive essa inconsistência no schema (não é escopo desta etapa unificar) — fica registrada
-como decisão pendente no final deste documento.
+- `flock.species`: string livre (rótulo real do usuário, ex. `"Galinhas Embrapa 051"`) —
+  **não faz parte** desta unificação, é nome de linha do plantel, não enum de espécie.
+- `flockIncubation.species` / `flockCleaning.species`: enum `'quail' | 'chicken'` — já estava
+  correto, sem mudança.
+- `expenseSpeciesOverride.species`: era enum `'codorna' | 'galinha'` (português), corrigido pra
+  `'quail' | 'chicken'` na migration, no Form Request (`in:quail,chicken`) e em qualquer outro
+  ponto do backend que comparasse por esse valor.
 
 ## Observação sobre relacionamentos "por nome" no front
 
@@ -197,7 +201,7 @@ Fonte: `expense-species-override.interface.ts`.
 | Campo | Tipo | Obrigatório |
 |---|---|---|
 | expense_id | FK → expenses, único | sim |
-| species | enum('codorna','galinha') nullable | não | `null` = força rateio pelo plantel |
+| species | enum('quail','chicken') nullable | não | `null` = força rateio pelo plantel |
 | reason | text | sim |
 
 Sem `updated_at` (`UPDATED_AT = null`, mesmo padrão de `sale_exclusions`).
@@ -339,10 +343,12 @@ apiResource('flock-cleanings', FlockCleaningController::class)
 
 ## Decisões pendentes (preciso de confirmação antes de seguir pra lógica de negócio)
 
-1. **Unificar vocabulário de espécie?** Hoje são 3: `flock.species` (texto livre),
-   `quail/chicken` (`flock_incubations`, `flock_cleanings`), `codorna/galinha`
-   (`expense_species_overrides`, rateio). Mantive como está — decidir se unifica num enum só
-   antes de implementar a lógica de rateio no backend.
+1. ~~**Unificar vocabulário de espécie?**~~ **RESOLVIDO.** Decisão: unificar em inglês
+   (`quail`/`chicken`) como padrão de código em todo o backend; `flock.species` continua texto
+   livre (não é enum de espécie, é rótulo/nome de linha do plantel — fora do escopo). Labels em
+   português seguem existindo, mas só na camada de exibição (front/tradução), nunca como valor
+   armazenado ou comparado no banco/backend. `expense_species_overrides.species` corrigido de
+   `codorna/galinha` pra `quail/chicken` (migration + Form Request).
 2. **`sales.seller_id`**: hoje é obrigatório (front exige "Vendedor" na venda). Confirma que
    toda venda tem vendedor, ou existe caso de venda direta sem vendedor cadastrado?
 3. **`feed_open_logs.feed_stock_id` nullable + `feed_type` redundante**: aceito esse desenho

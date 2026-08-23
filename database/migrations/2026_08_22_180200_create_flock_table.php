@@ -8,9 +8,8 @@ return new class extends Migration
 {
     /**
      * Headcount atual do plantel por linha (`species` é rótulo livre digitado
-     * pelo usuário, ex. "Galinhas Embrapa 051" — não é o enum
-     * quail/chicken/codorna/galinha usado em outras tabelas; ver decisão
-     * pendente em docs/plano-entidades.md).
+     * pelo usuário, ex. "Galinhas Embrapa 051" — não é o enum quail/chicken
+     * usado nas demais tabelas; ver docs/plano-entidades.md).
      */
     public function up(): void
     {

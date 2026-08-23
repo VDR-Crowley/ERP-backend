@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('expense_species_overrides', function (Blueprint $table) {
             $table->id();
             $table->foreignId('expense_id')->unique()->constrained()->cascadeOnDelete();
-            $table->enum('species', ['codorna', 'galinha'])->nullable();
+            $table->enum('species', ['quail', 'chicken'])->nullable();
             $table->text('reason');
             $table->timestamp('created_at')->nullable();
         });
