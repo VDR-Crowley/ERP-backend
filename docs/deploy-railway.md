@@ -7,6 +7,54 @@ comando diferente.
 > Status: PR #1 já mergeado em `main`. O Railway builda a partir da
 > branch/commit configurado no projeto.
 
+## 0.1 Build: Dockerfile explícito (não Nixpacks puro)
+
+O repositório tem um `Dockerfile` na raiz. O Railway detecta e usa
+automaticamente sempre que existe um `Dockerfile` no diretório raiz do
+service — não precisa configurar nada no painel pra ativar isso, nem trocar
+builder manualmente. Nada do resto deste documento muda por causa disso: os
+3 services continuam apontando pro mesmo repositório/branch, só que agora
+buildam a partir do `Dockerfile` em vez da autodetecção Nixpacks.
+
+Motivo da troca: a autodetecção Nixpacks já causou dois erros de build
+diferentes neste projeto (nome de extensão inválido e versão de PHP
+incompatível — ambos corrigidos, ver seção 2.1/2.2 abaixo, mantida como
+histórico). Um Dockerfile explícito dá controle direto sobre versão de PHP,
+extensões instaladas e imagem base, sem depender de heurística de
+autodetecção lendo `composer.json`.
+
+**Decisão de servidor HTTP: `php artisan serve`, não nginx+php-fpm.** Prática
+padrão de produção Laravel é nginx (ou outro reverse proxy) na frente de
+php-fpm, por concorrência (múltiplos workers FPM) e por servir assets
+estáticos direto pelo webserver. Esse projeto é uma ferramenta interna de
+gestão de uma fazenda pequena: API-only (sem Blade/assets — o front é outro
+app com deploy próprio), baixo tráfego, um único node por service. Rodar
+`php artisan serve` embutido dentro do container elimina a necessidade de
+configurar e manter nginx.conf, pool de php-fpm e um supervisor pra
+gerenciar os dois processos — um único processo PHP resolve, e é isso que o
+`Dockerfile` faz. Se o tráfego crescer a ponto de `php artisan serve` virar
+gargalo (é single-threaded), migrar pra php-fpm+nginx (ou Swoole/RoadRunner)
+é um passo natural futuro, não uma correção de um erro atual.
+
+O `Dockerfile`:
+
+- Base `php:8.4-cli-bookworm`.
+- Extensões instaladas via `install-php-extensions` (mlocati): as mesmas
+  `ext-*` do `composer.json` (seção 2.2) + `pdo_pgsql` (Postgres de
+  produção) + `pdo_sqlite` (paridade com dev/testing, que usa sqlite) +
+  `opcache`. As demais (`ctype`, `fileinfo`, `filter`, `iconv`, `tokenizer`,
+  `session`, `json`) já vêm habilitadas por padrão na imagem oficial do PHP.
+- `composer install --no-dev --optimize-autoloader` (em duas etapas: sem
+  scripts antes de copiar o código-fonte, pra cachear a camada; depois
+  `composer dump-autoload` com o código já presente).
+- `EXPOSE 8080` só como documentação — o `CMD` de fato escuta em `$PORT`
+  (variável que o Railway injeta em runtime), não numa porta fixa:
+  `php artisan serve --host=0.0.0.0 --port=${PORT:-8080}`.
+- **Migration + cache continuam fora do `CMD`**, no Pre-Deploy Command do App
+  Service (seção 2 abaixo) — isso é um recurso do Railway independente do
+  builder (funciona igual com Dockerfile ou Nixpacks), então nada muda no
+  fluxo de deploy documentado neste arquivo.
+
 ## 0. Pré-requisito
 
 Conta no Railway + projeto criado (`railway init` ou pelo dashboard). Isso é
@@ -22,14 +70,13 @@ services como `${{Postgres.DATABASE_URL}}`.
 
 Service principal, serve a API.
 
-- **Build Command**: padrão do Nixpacks (detecta Laravel via `composer.json`,
-  roda `composer install`).
+- **Build**: automático via `Dockerfile` da raiz (ver seção 0.1) — Railway
+  detecta sozinho, não precisa selecionar builder no painel.
 - **Pre-Deploy Command**: `bash railway/init-app.sh`
   Roda migrations, limpa e recria os caches (config/event/route/view) antes
   do deploy trocar de versão.
-- **Custom Start Command**: deixar o padrão do Nixpacks para Laravel (serve
-  via `php artisan serve` ou o servidor web que o Nixpacks provisionar) —
-  não precisa de script próprio pra isso.
+- **Custom Start Command**: deixar em branco — usa o `CMD` do `Dockerfile`
+  (`php artisan serve --host=0.0.0.0 --port=${PORT:-8080}`).
 - **Domínio público**: em **Settings → Networking → Generate Domain**. Só
   esse service precisa de domínio público; Cron e Worker não recebem tráfego
   HTTP.
@@ -76,9 +123,14 @@ não só a extensão do erro atual.
 
 Roda o scheduler do Laravel (`php artisan schedule:run`) a cada minuto.
 
-- Mesmo repositório/branch do App Service.
-- **Build Command**: padrão (mesma imagem).
+- Mesmo repositório/branch do App Service — builda a **mesma imagem Docker**
+  (mesmo `Dockerfile`), só troca o Custom Start Command.
+- **Build**: automático via `Dockerfile` (mesma imagem do App Service).
 - **Custom Start Command**: `bash railway/run-cron.sh`
+  Isso sobrescreve o `CMD` do `Dockerfile` por completo — o Railway roda
+  literalmente esse comando dentro do container em vez do `php artisan
+  serve` padrão. É o mesmo mecanismo de Custom Start Command que já existia
+  com Nixpacks; funciona igual com Dockerfile.
 - Sem domínio público.
 - Hoje `routes/console.php` não tem nenhum `Schedule::` registrado — o
   service fica pronto e ocioso até o projeto precisar de alguma tarefa
@@ -89,9 +141,10 @@ Roda o scheduler do Laravel (`php artisan schedule:run`) a cada minuto.
 Processa a queue (`QUEUE_CONNECTION=database`, tabelas `jobs`/`failed_jobs`
 já existem via migration `0001_01_01_000002_create_jobs_table.php`).
 
-- Mesmo repositório/branch.
-- **Build Command**: padrão.
+- Mesmo repositório/branch — mesma imagem Docker do App Service.
+- **Build**: automático via `Dockerfile` (mesma imagem do App Service).
 - **Custom Start Command**: `bash railway/run-worker.sh`
+  Mesmo mecanismo de override do `CMD` descrito na seção do Cron Service.
 - Sem domínio público.
 
 ## 5. Variáveis de ambiente (todos os 3 services)
@@ -133,12 +186,18 @@ O projeto não usa autenticação stateful de SPA via Sanctum (só
    (`railway/run-cron.sh` e `railway/run-worker.sh`) e as mesmas variáveis
    de ambiente (especialmente `DB_URL`, `APP_KEY`, `QUEUE_CONNECTION`).
 
-## 7. Scripts criados
+## 7. Scripts e arquivos criados
 
+- `Dockerfile` — build da imagem única reaproveitada pelos 3 services (ver
+  seção 0.1). `php artisan serve` como servidor HTTP, extensões PHP
+  necessárias instaladas explicitamente, escuta em `$PORT`.
+- `.dockerignore` — evita copiar `vendor/`, `.env`, `.git`, `storage/logs`,
+  `node_modules` etc. pro contexto de build.
 - `railway/init-app.sh` — Pre-Deploy do App Service: migrate + rebuild de
   caches.
 - `railway/run-worker.sh` — Start Command do Worker Service: `queue:work`.
 - `railway/run-cron.sh` — Start Command do Cron Service: loop de 60s
   chamando `schedule:run`.
 
-Todos com permissão de execução (`chmod +x`, modo `100755` no git).
+Os três scripts com permissão de execução (`chmod +x`, modo `100755` no
+git).
