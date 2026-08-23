@@ -18,6 +18,7 @@ class HatchEventFactory extends Factory
             'date' => now()->toDateString(),
             'count' => fake()->numberBetween(10, 50),
             'notes' => null,
+            'is_mock' => true,
         ];
     }
 }

@@ -21,6 +21,7 @@ class FeedStockFactory extends Factory
             'kg_in_stock' => $bags * $weight,
             'last_bag_weight_kg' => $weight,
             'expiration_date' => now()->addMonths(3)->toDateString(),
+            'is_mock' => true,
         ];
     }
 }

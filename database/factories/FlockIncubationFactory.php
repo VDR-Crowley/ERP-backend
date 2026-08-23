@@ -21,6 +21,7 @@ class FlockIncubationFactory extends Factory
             'egg_cost' => fake()->randomFloat(2, 50, 200),
             'feed_cost' => fake()->randomFloat(2, 20, 100),
             'notes' => null,
+            'is_mock' => true,
         ];
     }
 }

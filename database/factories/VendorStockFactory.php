@@ -18,6 +18,7 @@ class VendorStockFactory extends Factory
             'product_id' => Product::factory(),
             'vendedor_id' => Vendedor::factory(),
             'quantity' => fake()->numberBetween(0, 50),
+            'is_mock' => true,
         ];
     }
 }

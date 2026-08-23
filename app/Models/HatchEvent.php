@@ -2,21 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['flock_incubation_id', 'date', 'count', 'notes'])]
+#[Fillable(['flock_incubation_id', 'date', 'count', 'notes', 'is_mock'])]
 class HatchEvent extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMockFlag;
 
     protected function casts(): array
     {
         return [
             'date' => 'date',
             'count' => 'integer',
+            'is_mock' => 'boolean',
         ];
     }
 

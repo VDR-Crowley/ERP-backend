@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['product_id', 'vendedor_id', 'quantity'])]
+#[Fillable(['product_id', 'vendedor_id', 'quantity', 'is_mock'])]
 class VendorStock extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMockFlag;
 
     /** Tabela no singular — o inflector padrão pluralizaria pra "vendor_stocks". */
     protected $table = 'vendor_stock';
@@ -19,6 +20,7 @@ class VendorStock extends Model
     {
         return [
             'quantity' => 'integer',
+            'is_mock' => 'boolean',
         ];
     }
 

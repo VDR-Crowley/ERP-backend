@@ -20,6 +20,7 @@ class ExpenseFactory extends Factory
             'unit_price' => null,
             'amount' => fake()->randomFloat(2, 10, 300),
             'paid' => true,
+            'is_mock' => true,
         ];
     }
 }

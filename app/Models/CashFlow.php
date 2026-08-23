@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['date', 'description', 'inflow', 'amount'])]
+#[Fillable(['date', 'description', 'inflow', 'amount', 'is_mock'])]
 class CashFlow extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMockFlag;
 
     protected function casts(): array
     {
@@ -17,6 +18,7 @@ class CashFlow extends Model
             'date' => 'date',
             'inflow' => 'boolean',
             'amount' => 'decimal:2',
+            'is_mock' => 'boolean',
         ];
     }
 }

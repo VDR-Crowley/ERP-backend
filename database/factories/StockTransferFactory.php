@@ -22,6 +22,7 @@ class StockTransferFactory extends Factory
             'to_location_type' => 'plantel',
             'to_vendedor_id' => null,
             'note' => null,
+            'is_mock' => true,
         ];
     }
 }

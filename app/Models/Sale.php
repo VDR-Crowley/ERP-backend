@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,11 +12,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'date', 'product_id', 'quantity', 'unit_price', 'total', 'payment_pending',
     'buyer', 'seller_id', 'delivery_pending', 'delivery_date',
-    'stock_location_type', 'stock_location_vendedor_id',
-])]
+    'stock_location_type', 'stock_location_vendedor_id', 'is_mock', ])]
 class Sale extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMockFlag;
 
     protected function casts(): array
     {
@@ -27,6 +27,7 @@ class Sale extends Model
             'payment_pending' => 'boolean',
             'delivery_pending' => 'boolean',
             'delivery_date' => 'date',
+            'is_mock' => 'boolean',
         ];
     }
 

@@ -18,6 +18,7 @@ class FlockFactory extends Factory
             'feed_bags_per_month' => fake()->numberBetween(1, 5),
             'bag_price' => fake()->randomFloat(2, 50, 150),
             'monthly_total' => fake()->randomFloat(2, 100, 500),
+            'is_mock' => true,
         ];
     }
 }

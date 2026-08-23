@@ -30,6 +30,7 @@ class SaleFactory extends Factory
             'delivery_date' => null,
             'stock_location_type' => 'plantel',
             'stock_location_vendedor_id' => null,
+            'is_mock' => true,
         ];
     }
 }

@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['date', 'quail_eggs', 'chicken_eggs'])]
+#[Fillable(['date', 'quail_eggs', 'chicken_eggs', 'is_mock'])]
 class DailyProduction extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMockFlag;
 
     protected function casts(): array
     {
@@ -17,6 +18,7 @@ class DailyProduction extends Model
             'date' => 'date',
             'quail_eggs' => 'integer',
             'chicken_eggs' => 'integer',
+            'is_mock' => 'boolean',
         ];
     }
 }

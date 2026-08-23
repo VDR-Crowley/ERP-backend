@@ -16,6 +16,7 @@ class VendedorFactory extends Factory
             'name' => fake()->name(),
             'contact' => fake()->phoneNumber(),
             'active' => true,
+            'is_mock' => true,
         ];
     }
 }

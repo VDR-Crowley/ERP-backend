@@ -18,6 +18,7 @@ class FeedOpenLogFactory extends Factory
             'feed_type' => fake()->word(),
             'date' => now()->toDateString(),
             'weight_kg' => 40,
+            'is_mock' => true,
         ];
     }
 }

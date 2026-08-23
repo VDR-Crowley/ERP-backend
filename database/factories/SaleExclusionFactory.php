@@ -16,6 +16,7 @@ class SaleExclusionFactory extends Factory
         return [
             'sale_id' => Sale::factory(),
             'reason' => fake()->sentence(),
+            'is_mock' => true,
         ];
     }
 }

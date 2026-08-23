@@ -17,6 +17,7 @@ class ExpenseSpeciesOverrideFactory extends Factory
             'expense_id' => Expense::factory(),
             'species' => 'quail',
             'reason' => fake()->sentence(),
+            'is_mock' => true,
         ];
     }
 }
