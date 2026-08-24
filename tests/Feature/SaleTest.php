@@ -116,4 +116,88 @@ class SaleTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('stock_location_vendedor_id');
     }
+
+    /** Trava contra duplicata em reimportação de planilha (date+product_id+quantity+unit_price+buyer+seller_id). */
+    public function test_store_rejects_exact_duplicate(): void
+    {
+        $product = Product::factory()->create(['stock' => 50]);
+        $vendedor = Vendedor::factory()->create();
+
+        Sale::factory()->create([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 15,
+            'buyer' => 'Maria',
+            'seller_id' => $vendedor->id,
+        ]);
+
+        $this->postJson('/api/sales', $this->payload([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 15,
+            'total' => 150,
+            'buyer' => 'Maria',
+            'seller_id' => $vendedor->id,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('date');
+
+        $this->assertSame(1, Sale::count());
+        // Estoque não foi debitado de novo pela venda rejeitada.
+        $this->assertSame(50, $product->fresh()->stock);
+    }
+
+    public function test_store_allows_sale_with_different_quantity_same_day(): void
+    {
+        $product = Product::factory()->create();
+        $vendedor = Vendedor::factory()->create();
+
+        Sale::factory()->create([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 15,
+            'buyer' => 'Maria',
+            'seller_id' => $vendedor->id,
+        ]);
+
+        $this->postJson('/api/sales', $this->payload([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 20,
+            'unit_price' => 15,
+            'total' => 300,
+            'buyer' => 'Maria',
+            'seller_id' => $vendedor->id,
+        ]))->assertCreated();
+
+        $this->assertSame(2, Sale::count());
+    }
+
+    public function test_store_allows_same_sale_data_for_a_different_buyer(): void
+    {
+        $product = Product::factory()->create();
+        $vendedor = Vendedor::factory()->create();
+
+        Sale::factory()->create([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 15,
+            'buyer' => 'Maria',
+            'seller_id' => $vendedor->id,
+        ]);
+
+        $this->postJson('/api/sales', $this->payload([
+            'date' => '2026-08-20',
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 15,
+            'total' => 150,
+            'buyer' => 'João',
+            'seller_id' => $vendedor->id,
+        ]))->assertCreated();
+
+        $this->assertSame(2, Sale::count());
+    }
 }
