@@ -79,4 +79,43 @@ class FeedStockTest extends TestCase
             'weight_kg' => 0,
         ])->assertUnprocessable()->assertJsonValidationErrors('weight_kg');
     }
+
+    public function test_open_bag_rejects_exact_duplicate(): void
+    {
+        $feedStock = FeedStock::factory()->create([
+            'type' => 'Codorna Postura',
+            'bags_in_stock' => 5,
+            'kg_in_stock' => 200,
+        ]);
+
+        $this->postJson("/api/feed-stocks/{$feedStock->id}/open-bag", [
+            'date' => '2026-08-20',
+            'weight_kg' => 40,
+        ])->assertOk();
+
+        $this->postJson("/api/feed-stocks/{$feedStock->id}/open-bag", [
+            'date' => '2026-08-20',
+            'weight_kg' => 40,
+        ])->assertUnprocessable()->assertJsonValidationErrors('date');
+
+        $this->assertSame(1, $feedStock->openLogs()->count());
+        $this->assertSame(4, $feedStock->fresh()->bags_in_stock);
+    }
+
+    public function test_open_bag_allows_same_type_and_weight_on_different_days(): void
+    {
+        $feedStock = FeedStock::factory()->create(['type' => 'Codorna Postura']);
+
+        $this->postJson("/api/feed-stocks/{$feedStock->id}/open-bag", [
+            'date' => '2026-08-20',
+            'weight_kg' => 40,
+        ])->assertOk();
+
+        $this->postJson("/api/feed-stocks/{$feedStock->id}/open-bag", [
+            'date' => '2026-08-21',
+            'weight_kg' => 40,
+        ])->assertOk();
+
+        $this->assertSame(2, $feedStock->openLogs()->count());
+    }
 }
