@@ -23,7 +23,6 @@ class UpdateProductRequest extends FormRequest
             'unit_price' => ['required', 'numeric', 'min:0'],
             'stock' => ['required', 'integer', 'min:0'],
             'eggs_per_unit' => ['required', 'integer', 'min:0'],
-            'egg_species' => ['nullable', Rule::in(['quail', 'chicken'])],
         ];
     }
 }

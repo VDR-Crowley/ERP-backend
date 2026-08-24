@@ -18,13 +18,7 @@ class ProductFactory extends Factory
             'unit_price' => fake()->randomFloat(2, 5, 50),
             'stock' => fake()->numberBetween(0, 100),
             'eggs_per_unit' => 30,
-            'egg_species' => null,
             'is_mock' => true,
         ];
-    }
-
-    public function eggSpecies(string $species): static
-    {
-        return $this->state(fn () => ['egg_species' => $species]);
     }
 }

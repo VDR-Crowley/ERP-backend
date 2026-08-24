@@ -20,13 +20,7 @@ class StockLocationService
         }
 
         if ($locationType === 'plantel') {
-            // Produto de ovo mapeado (`egg_species`): estoque do Plantel é
-            // calculado on-the-fly a partir de produção/vendas/transferências
-            // (ver `Product::stock()`), não passa pela coluna crua — escrever
-            // aqui seria dado morto que ninguém lê.
-            if (! $product->isEggProduct()) {
-                $product->increment('stock', $delta);
-            }
+            $product->increment('stock', $delta);
 
             return;
         }
