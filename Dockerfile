@@ -75,11 +75,20 @@ EXPOSE 8080
 # Railway injeta $PORT em runtime — o container precisa escutar nela, não
 # numa porta fixa. Fica em shell form de propósito pra expandir a variável.
 #
-# Migration + cache (config/event/route/view) ficam no Pre-Deploy Command do
-# App Service (`bash railway/init-app.sh`, já documentado em
-# docs/deploy-railway.md), não aqui no CMD — esse é um recurso do Railway
-# independente do builder (funciona igual com Dockerfile ou Nixpacks) e
-# preserva a arquitetura majestic monolith: Cron e Worker sobrescrevem esse
-# CMD via Custom Start Command (`railway/run-cron.sh` / `railway/run-worker.sh`)
-# sem herdar nem repetir a lógica de migration a cada restart deles.
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+# Cache (config/event/route/view) continua só no Pre-Deploy Command do App
+# Service (`bash railway/init-app.sh`, documentado em docs/deploy-railway.md)
+# — não repetido aqui porque Cron/Worker sobrescrevem esse CMD via Custom
+# Start Command (`railway/run-cron.sh` / `railway/run-worker.sh`) e não
+# precisam de cache pra rodar.
+#
+# `migrate --force` AQUI TAMBÉM (redundante com o Pre-Deploy, idempotente —
+# migration já rodada é no-op): rede de segurança porque Pre-Deploy Command é
+# config manual do dashboard do Railway, fora do repositório/imagem — se
+# nunca foi configurado, foi apagado, ou falhou silenciosamente numa troca de
+# builder, o App Service subia servindo rotas cujas tabelas não existem
+# (`flock_incubations`/`hatch_events` reproduzido localmente: INSERT vira
+# `Illuminate\Database\QueryException` não tratada, 500 cru pro front em vez
+# de 422 — ver tests/Feature/FlockIncubationImportTest.php). Migrar antes do
+# serve garante que o processo que efetivamente atende HTTP nunca sobe com
+# schema desatualizado, mesmo que o Pre-Deploy tenha sido pulado.
+CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}

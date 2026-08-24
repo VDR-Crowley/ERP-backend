@@ -49,11 +49,23 @@ O `Dockerfile`:
   `composer dump-autoload` com o código já presente).
 - `EXPOSE 8080` só como documentação — o `CMD` de fato escuta em `$PORT`
   (variável que o Railway injeta em runtime), não numa porta fixa:
-  `php artisan serve --host=0.0.0.0 --port=${PORT:-8080}`.
-- **Migration + cache continuam fora do `CMD`**, no Pre-Deploy Command do App
-  Service (seção 2 abaixo) — isso é um recurso do Railway independente do
-  builder (funciona igual com Dockerfile ou Nixpacks), então nada muda no
-  fluxo de deploy documentado neste arquivo.
+  `php artisan migrate --force && php artisan serve --host=0.0.0.0
+  --port=${PORT:-8080}`.
+- **Cache continua fora do `CMD`**, no Pre-Deploy Command do App Service
+  (seção 2 abaixo) — isso é um recurso do Railway independente do builder
+  (funciona igual com Dockerfile ou Nixpacks), então nada muda no fluxo de
+  deploy documentado neste arquivo.
+- **`migrate --force` agora roda nos dois lugares** (Pre-Deploy Command E o
+  `CMD`, idempotente — migration já rodada é no-op): incidente real em
+  produção — Pre-Deploy Command é config manual do dashboard do Railway,
+  fora do repositório, então nunca foi garantido por código que rodasse; um
+  usuário importou a aba "Novo Plantel" e as 4 linhas voltaram 500
+  (`Illuminate\Database\QueryException`: tabela `flock_incubations`
+  inexistente) mesmo com o payload 100% válido, porque essa migration nunca
+  rodou no Postgres de produção. `migrate --force` no `CMD` garante que o
+  processo que efetivamente atende HTTP nunca sobe com schema desatualizado,
+  mesmo que o Pre-Deploy Command tenha sido pulado, apagado ou nunca
+  configurado.
 
 ## 0. Pré-requisito
 
