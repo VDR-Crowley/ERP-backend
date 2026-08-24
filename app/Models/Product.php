@@ -58,6 +58,11 @@ class Product extends Model
      *   das tabelas de origem, sem estado próprio pra dessincronizar.
      *   `StockLocationService` pula a escrita na coluna crua pra esses
      *   produtos (ver guarda lá) — ela fica sem uso, não é lida aqui.
+     *
+     * Perda registrada em `EggLoss` (quebra, consumo próprio, doação) desconta
+     * da produção ANTES do floor por `eggs_per_unit` — mesma lógica de "soma
+     * bruta primeiro" do item acima, senão perda fracionária por evento
+     * distorceria o floor da mesma forma que produção fracionada distorceria.
      */
     protected function stock(): Attribute
     {
@@ -81,8 +86,16 @@ class Product extends Model
         };
 
         $totalEggsProduced = (int) DailyProduction::query()->real()->sum($eggColumn);
+        $totalEggsLost = (int) EggLoss::query()->real()
+            ->where('species', $this->egg_species)
+            ->sum('quantity');
+
+        // floor() e não intdiv(): perda pode superar produção e deixar o
+        // dividendo negativo — intdiv trunca em direção a zero (ex.:
+        // intdiv(-10, 30) = 0), o que quebraria a garantia de "floor da soma
+        // bruta" acima pra valores negativos não-múltiplos.
         $unitsProduced = $this->eggs_per_unit > 0
-            ? intdiv($totalEggsProduced, $this->eggs_per_unit)
+            ? (int) floor(($totalEggsProduced - $totalEggsLost) / $this->eggs_per_unit)
             : 0;
 
         $soldAtPlantel = (int) Sale::query()->real()

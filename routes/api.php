@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\BusinessLineReportController;
 use App\Http\Controllers\Api\CashFlowController;
 use App\Http\Controllers\Api\DailyProductionController;
+use App\Http\Controllers\Api\EggLossController;
 use App\Http\Controllers\Api\EggStockController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FeedOpenLogController;
@@ -66,6 +67,7 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::apiResource('stock-transfers', StockTransferController::class);
     Route::apiResource('daily-productions', DailyProductionController::class);
     Route::apiResource('egg-stocks', EggStockController::class);
+    Route::apiResource('egg-losses', EggLossController::class);
 
     Route::apiResource('expenses', ExpenseController::class);
     Route::post('expenses/{expense}/species-override', [ExpenseController::class, 'storeSpeciesOverride']);
