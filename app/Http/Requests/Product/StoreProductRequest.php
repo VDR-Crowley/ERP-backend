@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Product;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreProductRequest extends FormRequest
 {
@@ -22,6 +23,7 @@ class StoreProductRequest extends FormRequest
             'unit_price' => ['required', 'numeric', 'min:0'],
             'stock' => ['required', 'integer', 'min:0'],
             'eggs_per_unit' => ['required', 'integer', 'min:0'],
+            'egg_species' => ['nullable', Rule::in(['quail', 'chicken'])],
         ];
     }
 }
