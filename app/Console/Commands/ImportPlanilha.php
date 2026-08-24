@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\DailyProduction;
-use App\Models\EggStock;
 use App\Models\Expense;
 use App\Models\FeedOpenLog;
 use App\Models\FeedStock;
@@ -63,7 +62,6 @@ class ImportPlanilha extends Command
         $this->importNovoPlantel($spreadsheet);
         $this->importVendas($spreadsheet, $products, $vendedores);
         $this->importProducao($spreadsheet);
-        $this->importEstoqueOvos($spreadsheet);
         $this->importDespesas($spreadsheet);
         $feedStocks = $this->importRacao($spreadsheet);
         $this->importRacaoSacosAbertos($spreadsheet, $feedStocks);
@@ -424,34 +422,6 @@ class ImportPlanilha extends Command
                 ]
             );
             $this->bump('daily_productions');
-        }
-    }
-
-    // -- Estoque de Ovos -------------------------------------------------
-
-    private function importEstoqueOvos(Spreadsheet $spreadsheet): void
-    {
-        foreach ($this->rows($spreadsheet, 'Estoque de Ovos') as $row) {
-            [$dateRaw, $quailEggs, $chickenEggs, $quailPacks, $chickenPacks, $quailValue, $chickenValue] = $row;
-
-            // Ambiguidade validada com o usuário em 2026-08-23 (linhas
-            // 05/07 e 06/07/2026 com valores negativos): decisão foi
-            // importar como está, sem clamp em zero.
-            $this->upsertByNaturalKey(
-                EggStock::class,
-                [],
-                ['date' => $this->parseDate($dateRaw)],
-                [
-                    'quail_eggs' => $this->toInt($quailEggs),
-                    'chicken_eggs' => $this->toInt($chickenEggs),
-                    'quail_packs' => $this->toFloat($quailPacks) ?? 0,
-                    'chicken_packs' => $this->toFloat($chickenPacks) ?? 0,
-                    'quail_stock_value' => $this->toFloat($quailValue) ?? 0,
-                    'chicken_stock_value' => $this->toFloat($chickenValue) ?? 0,
-                    'is_mock' => false,
-                ]
-            );
-            $this->bump('egg_stocks');
         }
     }
 

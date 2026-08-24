@@ -35,7 +35,6 @@ class WipeMockData extends Command
         'vendedores',
         'flock',
         'daily_productions',
-        'egg_stocks',
         'cash_flows',
         'feed_stocks',
         'flock_cleanings',

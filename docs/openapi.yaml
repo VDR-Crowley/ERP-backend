@@ -38,8 +38,6 @@ tags:
     description: Transferências de estoque entre Plantel e vendedores
   - name: DailyProductions
     description: Produção diária de ovos por espécie
-  - name: EggStocks
-    description: Estoque diário de ovos (unidades, bandejas e valor)
   - name: Expenses
     description: Despesas, com rateio por espécie via override manual
   - name: CashFlows
@@ -1401,104 +1399,6 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ============================================================
-  # EggStocks
-  # ============================================================
-  /egg-stocks:
-    get:
-      tags: [EggStocks]
-      summary: Listar estoque diário de ovos
-      security: [{bearerAuth: []}]
-      responses:
-        '200':
-          description: Lista de registros de estoque de ovos
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EggStock'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      tags: [EggStocks]
-      summary: Registrar estoque diário de ovos
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EggStockRequest'
-      responses:
-        '201':
-          description: Registro criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EggStock'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          description: Erro de validação (ex. já existe registro pra essa `date`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationErrorResponse'
-
-  /egg-stocks/{egg_stock}:
-    parameters:
-      - $ref: '#/components/parameters/EggStockId'
-    get:
-      tags: [EggStocks]
-      summary: Detalhar registro de estoque de ovos
-      security: [{bearerAuth: []}]
-      responses:
-        '200':
-          description: Registro
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EggStock'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags: [EggStocks]
-      summary: Atualizar registro de estoque de ovos
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EggStockRequest'
-      responses:
-        '200':
-          description: Registro atualizado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EggStock'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [EggStocks]
-      summary: Excluir registro de estoque de ovos
-      security: [{bearerAuth: []}]
-      responses:
-        '204':
-          description: Registro excluído
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # ============================================================
   # Expenses
   # ============================================================
   /expenses:
@@ -2133,13 +2033,6 @@ components:
       example: 1
     DailyProductionId:
       name: daily_production
-      in: path
-      required: true
-      schema:
-        type: integer
-      example: 1
-    EggStockId:
-      name: egg_stock
       in: path
       required: true
       schema:
@@ -3006,82 +2899,6 @@ components:
           type: integer
           nullable: true
           example: 30
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    # ------------------------------------------------------------
-    # EggStocks
-    # ------------------------------------------------------------
-    EggStockRequest:
-      type: object
-      required: [date, quail_packs, chicken_packs, quail_stock_value, chicken_stock_value]
-      properties:
-        date:
-          type: string
-          format: date
-          description: Único (`unique:egg_stocks,date`, ignorando o próprio registro no update)
-          example: "2026-08-20"
-        quail_eggs:
-          type: integer
-          minimum: 0
-          nullable: true
-        chicken_eggs:
-          type: integer
-          minimum: 0
-          nullable: true
-        quail_packs:
-          type: number
-          format: float
-          minimum: 0
-          example: 10.0
-        chicken_packs:
-          type: number
-          format: float
-          minimum: 0
-          example: 3.0
-        quail_stock_value:
-          type: number
-          format: float
-          minimum: 0
-          example: 150.0
-        chicken_stock_value:
-          type: number
-          format: float
-          minimum: 0
-          example: 90.0
-
-    EggStock:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        date:
-          type: string
-          format: date
-        quail_eggs:
-          type: integer
-          nullable: true
-        chicken_eggs:
-          type: integer
-          nullable: true
-        quail_packs:
-          type: string
-          description: Decimal (2 casas), serializado como string
-          example: "10.00"
-        chicken_packs:
-          type: string
-          example: "3.00"
-        quail_stock_value:
-          type: string
-          example: "150.00"
-        chicken_stock_value:
-          type: string
-          example: "90.00"
         created_at:
           type: string
           format: date-time
