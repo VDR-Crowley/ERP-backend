@@ -76,12 +76,13 @@ class NormalizeFlockIncubationEggCost extends Command
                     number_format($eggCost, 2, ',', '.'),
                     number_format($novo, 2, ',', '.'),
                 ],
+                'antigo' => $eggCost,
                 'novo' => $novo,
             ];
         }
 
         if (empty($toConvert) && empty($skippedZeroQty)) {
-            $this->info("Nenhuma linha com egg_cost acima de R$ " . number_format(self::MAX_PLAUSIVEL_POR_OVO, 2, ',', '.') . " por ovo — nada pra converter ({$skippedJaUnitario} já unitária(s)).");
+            $this->info('Nenhuma linha com egg_cost acima de R$ '.number_format(self::MAX_PLAUSIVEL_POR_OVO, 2, ',', '.')." por ovo — nada pra converter ({$skippedJaUnitario} já unitária(s)).");
 
             return self::SUCCESS;
         }
@@ -100,24 +101,27 @@ class NormalizeFlockIncubationEggCost extends Command
         }
 
         $convertedIds = [];
+        $convertedValues = [];
 
         if ($force) {
             foreach ($toConvert as $c) {
                 $c['row']->update(['egg_cost' => $c['novo']]);
                 $convertedIds[] = $c['row']->id;
+                $convertedValues[$c['row']->id] = ['antigo' => $c['antigo'], 'novo' => $c['novo']];
             }
         }
 
         $this->newLine();
         $summary = $force
-            ? 'Convertida(s) ' . count($toConvert) . ' linha(s); ' . count($skippedZeroQty) . ' pulada(s) por egg_count=0; ' . $skippedJaUnitario . ' já estava(m) em preço unitário.'
-            : '[DRY-RUN] ' . count($toConvert) . ' linha(s) seriam convertidas; ' . count($skippedZeroQty) . ' pulada(s) por egg_count=0; ' . $skippedJaUnitario . ' já em preço unitário. Nada foi alterado. Rode com --force para executar de verdade.';
+            ? 'Convertida(s) '.count($toConvert).' linha(s); '.count($skippedZeroQty).' pulada(s) por egg_count=0; '.$skippedJaUnitario.' já estava(m) em preço unitário.'
+            : '[DRY-RUN] '.count($toConvert).' linha(s) seriam convertidas; '.count($skippedZeroQty).' pulada(s) por egg_count=0; '.$skippedJaUnitario.' já em preço unitário. Nada foi alterado. Rode com --force para executar de verdade.';
 
         $this->info($summary);
 
         Log::info('flock-incubations:normalize-egg-cost executado', [
             'force' => $force,
             'converted_ids' => $convertedIds,
+            'converted_values' => $convertedValues,
             'skipped_zero_qty_ids' => array_column($skippedZeroQty, 0),
             'already_unit_count' => $skippedJaUnitario,
         ]);

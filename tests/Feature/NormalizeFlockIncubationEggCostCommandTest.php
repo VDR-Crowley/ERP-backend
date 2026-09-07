@@ -55,6 +55,15 @@ class NormalizeFlockIncubationEggCostCommandTest extends TestCase
         $this->assertSame('75.80', $semQtd->fresh()->egg_cost);
     }
 
+    public function test_force_ignores_rows_with_null_egg_cost(): void
+    {
+        $semCusto = FlockIncubation::factory()->create(['egg_count' => 100, 'egg_cost' => null]);
+
+        $this->artisan('flock-incubations:normalize-egg-cost', ['--force' => true])->assertExitCode(0);
+
+        $this->assertNull($semCusto->fresh()->egg_cost);
+    }
+
     public function test_force_is_idempotent(): void
     {
         FlockIncubation::factory()->create(['egg_count' => 250, 'egg_cost' => 75.80]);
