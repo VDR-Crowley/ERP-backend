@@ -28,6 +28,10 @@ API sobe em `http://localhost:8000`. Health check: `GET /up`.
 - `routes/web.php` — apenas rota raiz de status (`/`), sem views/Blade — este backend é API-only
 - `routes/console.php` — comandos artisan agendados
 
+## Servidor MCP (PHP)
+
+Servidor [MCP](https://modelcontextprotocol.io) de leitura, em PHP, vivendo dentro deste repo (`app/Mcp/` + `php artisan mcp:serve`) — expõe a API como tools tipadas pra um assistente de IA. Ver [`docs/MCP.md`](docs/MCP.md) (instalação, configuração, registro no Claude Code/Desktop, tabela de tools). Existe também um servidor Node equivalente em `../ERP-MCP` — ver a nota de "dois servidores" em `docs/MCP.md`.
+
 ## Autenticação (Sanctum)
 
 Instalado via `php artisan install:api`. Model `App\Models\User` já tem a trait `Laravel\Sanctum\HasApiTokens`.
