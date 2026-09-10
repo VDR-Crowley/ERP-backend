@@ -14,7 +14,7 @@ class McpServerFactoryTest extends TestCase
 {
     public function test_registers_exactly_29_tools_with_expected_names(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $tools = $factory->registry()->getTools();
@@ -28,7 +28,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_get_sale_tool_requires_integer_sale_id(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $tool = $factory->registry()->getTool('get_sale')->tool;
@@ -39,7 +39,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_get_business_line_report_tool_has_optional_start_end(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $tool = $factory->registry()->getTool('get_business_line_report')->tool;
@@ -51,7 +51,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_tool_annotations_mark_read_only(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $annotations = $factory->registry()->getTool('list_sales')->tool->annotations;
@@ -68,7 +68,7 @@ class McpServerFactoryTest extends TestCase
         Config::set('mcp.base_url', 'https://mcp-test.example/api');
         Http::fake(['*' => Http::response(['id' => 42, 'total' => 10.5], 200)]);
 
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $handler = $factory->registry()->getTool('get_sale')->handler;
@@ -84,7 +84,7 @@ class McpServerFactoryTest extends TestCase
         Config::set('mcp.base_url', 'https://mcp-test.example/api');
         Http::fake(['*' => Http::response(['message' => 'No query results for model.'], 404)]);
 
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $handler = $factory->registry()->getTool('get_sale')->handler;

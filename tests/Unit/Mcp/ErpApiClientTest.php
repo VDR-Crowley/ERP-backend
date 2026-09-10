@@ -25,7 +25,7 @@ class ErpApiClientTest extends TestCase
     {
         Http::fake();
 
-        $client = new ErpApiClient();
+        $client = new ErpApiClient;
         $request = new \ReflectionMethod(ErpApiClient::class, 'request');
         $request->setAccessible(true);
 
@@ -41,7 +41,7 @@ class ErpApiClientTest extends TestCase
         Http::fake();
 
         try {
-            (new ErpApiClient())->get('/sales');
+            (new ErpApiClient)->get('/sales');
             $this->fail('Esperava MissingTokenException');
         } catch (MissingTokenException $e) {
             Http::assertNothingSent();
@@ -54,7 +54,7 @@ class ErpApiClientTest extends TestCase
         Config::set('mcp.base_url', 'https://mcp-test.example/api');
         Http::fake(['*' => Http::response(['id' => 1], 200)]);
 
-        (new ErpApiClient())->get('/sales/1');
+        (new ErpApiClient)->get('/sales/1');
 
         Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer abc123'));
     }
@@ -65,7 +65,7 @@ class ErpApiClientTest extends TestCase
         Config::set('mcp.base_url', 'https://mcp-test.example/api');
         Http::fake(['*' => Http::response([], 200)]);
 
-        (new ErpApiClient())->get('/sales/{sale}', ['sale' => 42]);
+        (new ErpApiClient)->get('/sales/{sale}', ['sale' => 42]);
 
         Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales/42');
     }
@@ -76,7 +76,7 @@ class ErpApiClientTest extends TestCase
         Config::set('mcp.base_url', 'https://mcp-test.example/api');
         Http::fake(['*' => Http::response([], 200)]);
 
-        (new ErpApiClient())->get('/business-line-report', [], ['start' => '2026-01-01', 'end' => null]);
+        (new ErpApiClient)->get('/business-line-report', [], ['start' => '2026-01-01', 'end' => null]);
 
         Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/business-line-report?start=2026-01-01');
     }
@@ -89,7 +89,7 @@ class ErpApiClientTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
 
-        (new ErpApiClient())->get('/sales/{sale}', []);
+        (new ErpApiClient)->get('/sales/{sale}', []);
     }
 
     public function test_exposes_401_body_and_message(): void
@@ -99,7 +99,7 @@ class ErpApiClientTest extends TestCase
         Http::fake(['*' => Http::response(['message' => 'Unauthenticated.'], 401)]);
 
         try {
-            (new ErpApiClient())->get('/sales');
+            (new ErpApiClient)->get('/sales');
             $this->fail('Esperava ErpApiException');
         } catch (ErpApiException $e) {
             $this->assertSame(401, $e->status);
@@ -116,7 +116,7 @@ class ErpApiClientTest extends TestCase
         Http::fake(['*' => Http::response(['message' => 'No query results for model.'], 404)]);
 
         try {
-            (new ErpApiClient())->get('/sales/{sale}', ['sale' => 999]);
+            (new ErpApiClient)->get('/sales/{sale}', ['sale' => 999]);
             $this->fail('Esperava ErpApiException');
         } catch (ErpApiException $e) {
             $this->assertSame(404, $e->status);
@@ -132,7 +132,7 @@ class ErpApiClientTest extends TestCase
         Http::fake(['*' => Http::response('Bad Gateway', 502)]);
 
         try {
-            (new ErpApiClient())->get('/sales');
+            (new ErpApiClient)->get('/sales');
             $this->fail('Esperava ErpApiException');
         } catch (ErpApiException $e) {
             $this->assertSame(502, $e->status);
@@ -149,6 +149,6 @@ class ErpApiClientTest extends TestCase
         $this->expectException(ApiUnreachableException::class);
         $this->expectExceptionMessageMatches('/Connection refused/');
 
-        (new ErpApiClient())->get('/sales');
+        (new ErpApiClient)->get('/sales');
     }
 }

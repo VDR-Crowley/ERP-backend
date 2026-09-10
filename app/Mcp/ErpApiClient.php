@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Http;
 class ErpApiClient
 {
     /**
-     * @param array<string, int|string>            $pathParams
-     * @param array<string, int|string|bool|null>  $query
+     * @param  array<string, int|string>  $pathParams
+     * @param  array<string, int|string|bool|null>  $query
      */
     public function get(string $path, array $pathParams = [], array $query = []): array
     {
@@ -23,12 +23,12 @@ class ErpApiClient
     }
 
     /**
-     * @param array<string, int|string>           $pathParams
-     * @param array<string, int|string|bool|null> $query
+     * @param  array<string, int|string>  $pathParams
+     * @param  array<string, int|string|bool|null>  $query
      */
     private function request(string $method, string $path, array $pathParams, array $query): array
     {
-        if ('GET' !== $method) {
+        if ($method !== 'GET') {
             throw new \LogicException(
                 "ErpApiClient é somente leitura: recusou emitir uma requisição {$method} ".
                 '(isso é um bug no código, não input do usuário).',
@@ -37,7 +37,7 @@ class ErpApiClient
 
         $token = config('mcp.token');
         if (empty($token)) {
-            throw new MissingTokenException();
+            throw new MissingTokenException;
         }
 
         $url = $this->buildUrl($path, $pathParams, $query);
@@ -63,8 +63,8 @@ class ErpApiClient
     }
 
     /**
-     * @param array<string, int|string>           $pathParams
-     * @param array<string, int|string|bool|null> $query
+     * @param  array<string, int|string>  $pathParams
+     * @param  array<string, int|string|bool|null>  $query
      */
     private function buildUrl(string $path, array $pathParams, array $query): string
     {
@@ -74,7 +74,7 @@ class ErpApiClient
                 $name = $matches[1];
                 $value = $pathParams[$name] ?? null;
 
-                if (null === $value || '' === $value) {
+                if ($value === null || $value === '') {
                     throw new \InvalidArgumentException("Parâmetro de path obrigatório \"{$name}\" faltando pra {$path}");
                 }
 
@@ -86,7 +86,7 @@ class ErpApiClient
         $baseUrl = rtrim((string) config('mcp.base_url'), '/');
         $url = $baseUrl.$resolvedPath;
 
-        $query = array_filter($query, static fn ($value) => null !== $value);
+        $query = array_filter($query, static fn ($value) => $value !== null);
 
         return $query === [] ? $url : $url.'?'.http_build_query($query);
     }
@@ -96,19 +96,19 @@ class ErpApiClient
         $bodyMessage = \is_array($body) && \is_string($body['message'] ?? null) ? $body['message'] : null;
         $base = "API do MiniERP retornou {$status}";
 
-        if (401 === $status) {
+        if ($status === 401) {
             return "{$base}. Token ausente, inválido, expirado ou revogado (access tokens expiram em 2h) — ".
                 'pegue um novo (veja docs/MCP.md "Como obter um token").'.
                 ($bodyMessage ? " Mensagem da API: {$bodyMessage}" : '');
         }
 
-        if (403 === $status) {
+        if ($status === 403) {
             return "{$base}. Token autenticado mas sem a ability \"access\" pra essa rota ".
                 '(ex.: um refresh token foi usado aqui).'.
                 ($bodyMessage ? " Mensagem da API: {$bodyMessage}" : '');
         }
 
-        if (404 === $status) {
+        if ($status === 404) {
             return "{$base}. O recurso pedido não existe.".
                 ($bodyMessage ? " Mensagem da API: {$bodyMessage}" : '');
         }

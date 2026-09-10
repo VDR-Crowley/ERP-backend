@@ -16,13 +16,11 @@ final class McpServerFactory
 {
     private ?Registry $registry = null;
 
-    public function __construct(private readonly ErpApiClient $apiClient)
-    {
-    }
+    public function __construct(private readonly ErpApiClient $apiClient) {}
 
     public function build(): Server
     {
-        $registry = new Registry();
+        $registry = new Registry;
         $this->registry = $registry;
 
         $builder = Server::builder()
@@ -54,8 +52,8 @@ final class McpServerFactory
     }
 
     /**
-     * @param array{name: string, description: string, path: string, pathParams: array, queryParams: array} $def
-     * @param array<string, mixed> $args
+     * @param  array{name: string, description: string, path: string, pathParams: array, queryParams: array}  $def
+     * @param  array<string, mixed>  $args
      */
     private function callTool(array $def, array $args): array
     {
@@ -77,7 +75,7 @@ final class McpServerFactory
     }
 
     /**
-     * @param array{pathParams: array, queryParams: array} $def
+     * @param  array{pathParams: array, queryParams: array}  $def
      * @return array<string, mixed>
      */
     private function buildInputSchema(array $def): array

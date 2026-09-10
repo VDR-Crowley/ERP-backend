@@ -29,14 +29,14 @@ class McpServeCommand extends Command
         if (empty(config('mcp.token'))) {
             fwrite(
                 STDERR,
-                "[erp-mcp-php] Aviso: ERP_API_TOKEN não está configurado. Chamadas de tool vão falhar até um ".
+                '[erp-mcp-php] Aviso: ERP_API_TOKEN não está configurado. Chamadas de tool vão falhar até um '.
                 "token Sanctum válido ser configurado — veja docs/MCP.md \"Como obter um token\".\n",
             );
         }
 
         fwrite(STDERR, '[erp-mcp-php] Servidor MCP read-only rodando (API base: '.config('mcp.base_url').")\n");
 
-        $exitCode = $this->factory->build()->run(new StdioTransport());
+        $exitCode = $this->factory->build()->run(new StdioTransport);
 
         return \is_int($exitCode) ? $exitCode : self::SUCCESS;
     }
