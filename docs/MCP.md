@@ -141,3 +141,23 @@ php artisan test tests/Unit/Mcp   # só os testes deste servidor
 composer test                     # suíte inteira do backend
 php artisan mcp:serve             # roda localmente (precisa de ERP_API_TOKEN válido pras tools funcionarem)
 ```
+
+### Smoke test manual do protocolo
+
+Testar só `initialize` não prova nada: já houve um bug em que todo `tools/call`
+morria com `-32603` enquanto a suíte inteira ficava verde. Sempre exercite um
+`tools/call` de verdade — um sem argumentos e um com path param:
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual","version":"1.0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_sales","arguments":{}}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_sale","arguments":{"sale":42}}}' \
+  | php artisan mcp:serve
+```
+
+Sem token/API acessível, o esperado é `"isError":true` com a mensagem real
+(token faltando, 404, erro de conexão) — nunca `-32603 Error while executing tool`,
+que significa que a tool nem chegou a rodar. O equivalente automatizado disso é
+`tests/Unit/Mcp/McpProtocolRoundTripTest.php`.
