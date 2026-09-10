@@ -3,14 +3,24 @@
 namespace App\Mcp;
 
 use Mcp\Capability\Registry;
-use Mcp\Exception\ToolCallException;
+use Mcp\Schema\Tool;
 use Mcp\Schema\ToolAnnotations;
 use Mcp\Server;
+use Monolog\Handler\StreamHandler;
+use Monolog\Level;
+use Monolog\Logger;
+use Psr\Log\LoggerInterface;
 
 /**
- * Monta o `Mcp\Server` a partir de `ToolDefinitions` — um `addTool()` por
- * entrada, registrado num `Registry` próprio (via `setRegistry()`) pra ficar
+ * Monta o `Mcp\Server` a partir de `ToolDefinitions` — um par
+ * `Mcp\Schema\Tool` + `App\Mcp\ToolHandler` por entrada, registrado via
+ * `Builder::add()` num `Registry` próprio (via `setRegistry()`) pra ficar
  * inspecionável nos testes depois de `build()`.
+ *
+ * `Builder::add()` e não `addTool()`: ver o docblock de `ToolHandler` — o
+ * `addTool()` faz o `ReferenceHandler` mapear os argumentos JSON-RPC nos
+ * parâmetros do handler por nome (reflection), então uma closure
+ * `fn (array $args)` morre com -32603 em toda chamada.
  */
 final class McpServerFactory
 {
@@ -25,53 +35,44 @@ final class McpServerFactory
 
         $builder = Server::builder()
             ->setServerInfo('erp-mcp-php', '1.0.0')
+            ->setLogger($this->makeLogger())
             ->setRegistry($registry);
 
         foreach (ToolDefinitions::all() as $def) {
-            $builder->addTool(
-                handler: fn (array $args) => $this->callTool($def, $args),
-                name: $def['name'],
-                description: $def['description'],
-                inputSchema: $this->buildInputSchema($def),
-                annotations: new ToolAnnotations(
-                    readOnlyHint: true,
-                    destructiveHint: false,
-                    idempotentHint: true,
-                    openWorldHint: false,
+            $builder->add(
+                new Tool(
+                    name: $def['name'],
+                    title: null,
+                    inputSchema: $this->buildInputSchema($def),
+                    description: $def['description'],
+                    annotations: new ToolAnnotations(
+                        readOnlyHint: true,
+                        destructiveHint: false,
+                        idempotentHint: true,
+                        openWorldHint: false,
+                    ),
                 ),
+                new ToolHandler($def, $this->apiClient),
             );
         }
 
         return $builder->build();
     }
 
+    /**
+     * Logs do SDK vão pra STDERR — STDOUT é o canal do protocolo JSON-RPC
+     * (mesma restrição documentada em `McpServeCommand`). Warning pra cima só,
+     * pra não afogar o stderr do cliente MCP com o debug de cada tools/call.
+     */
+    private function makeLogger(): LoggerInterface
+    {
+        return new Logger('erp-mcp-php', [new StreamHandler('php://stderr', Level::Warning)]);
+    }
+
     /** Só disponível depois de `build()` — usado pra inspecionar o que foi registrado. */
     public function registry(): Registry
     {
         return $this->registry ?? throw new \LogicException('Chame build() antes de registry().');
-    }
-
-    /**
-     * @param  array{name: string, description: string, path: string, pathParams: array, queryParams: array}  $def
-     * @param  array<string, mixed>  $args
-     */
-    private function callTool(array $def, array $args): array
-    {
-        $pathParams = [];
-        foreach ($def['pathParams'] as $param) {
-            $pathParams[$param['name']] = $args[$param['name']] ?? null;
-        }
-
-        $query = [];
-        foreach ($def['queryParams'] as $param) {
-            $query[$param['name']] = $args[$param['name']] ?? null;
-        }
-
-        try {
-            return $this->apiClient->get($def['path'], $pathParams, $query);
-        } catch (\Throwable $e) {
-            throw new ToolCallException($e->getMessage(), previous: $e);
-        }
     }
 
     /**
