@@ -13,7 +13,7 @@ class AuthenticateMcpHttpTest extends TestCase
         config(['mcp.http_token' => 'segredo-correto']);
 
         $request = Request::create('/api/mcp', 'POST');
-        $middleware = new AuthenticateMcpHttp();
+        $middleware = new AuthenticateMcpHttp;
 
         $response = $middleware->handle($request, fn () => $this->fail('next() não deveria rodar'));
 
@@ -26,7 +26,7 @@ class AuthenticateMcpHttpTest extends TestCase
 
         $request = Request::create('/api/mcp', 'POST');
         $request->headers->set('Authorization', 'Bearer token-errado');
-        $middleware = new AuthenticateMcpHttp();
+        $middleware = new AuthenticateMcpHttp;
 
         $response = $middleware->handle($request, fn () => $this->fail('next() não deveria rodar'));
 
@@ -39,7 +39,7 @@ class AuthenticateMcpHttpTest extends TestCase
 
         $request = Request::create('/api/mcp', 'POST');
         $request->headers->set('Authorization', 'Bearer qualquer-coisa');
-        $middleware = new AuthenticateMcpHttp();
+        $middleware = new AuthenticateMcpHttp;
 
         $response = $middleware->handle($request, fn () => $this->fail('next() não deveria rodar'));
 
@@ -52,7 +52,7 @@ class AuthenticateMcpHttpTest extends TestCase
 
         $request = Request::create('/api/mcp', 'POST');
         $request->headers->set('Authorization', 'Bearer segredo-correto');
-        $middleware = new AuthenticateMcpHttp();
+        $middleware = new AuthenticateMcpHttp;
 
         $called = false;
         $response = $middleware->handle($request, function ($req) use (&$called) {

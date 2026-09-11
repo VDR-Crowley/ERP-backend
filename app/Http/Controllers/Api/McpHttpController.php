@@ -25,11 +25,11 @@ class McpHttpController
 
     public function __invoke(Request $request): Response
     {
-        $psrRequest = (new PsrHttpFactory())->createRequest($request);
+        $psrRequest = (new PsrHttpFactory)->createRequest($request);
 
         $transport = new StatelessHttpTransport($this->factory->buildStatelessProtocol());
         $psrResponse = $transport->handle($psrRequest);
 
-        return (new HttpFoundationFactory())->createResponse($psrResponse);
+        return (new HttpFoundationFactory)->createResponse($psrResponse);
     }
 }

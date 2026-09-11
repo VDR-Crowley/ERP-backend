@@ -11,6 +11,7 @@ use Mcp\Capability\Registry\ReferenceHandler;
 use Mcp\Exception\ToolCallException;
 use Mcp\Server\Session\InMemorySessionStore;
 use Mcp\Server\Session\Session;
+use Mcp\Server\Stateless\StatelessProtocol;
 use Tests\TestCase;
 
 class McpServerFactoryTest extends TestCase
@@ -131,10 +132,10 @@ class McpServerFactoryTest extends TestCase
 
     public function test_build_stateless_protocol_registers_the_same_29_tools(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $protocol = $factory->buildStatelessProtocol();
 
-        $this->assertInstanceOf(\Mcp\Server\Stateless\StatelessProtocol::class, $protocol);
+        $this->assertInstanceOf(StatelessProtocol::class, $protocol);
 
         $tools = $factory->registry()->getTools();
         $this->assertCount(29, $tools);
@@ -144,7 +145,7 @@ class McpServerFactoryTest extends TestCase
     {
         // Regression guard for the registerTools() extraction: build() must
         // keep behaving exactly as before.
-        $factory = new McpServerFactory(new ErpApiClient());
+        $factory = new McpServerFactory(new ErpApiClient);
         $factory->build();
 
         $this->assertCount(29, $factory->registry()->getTools());
