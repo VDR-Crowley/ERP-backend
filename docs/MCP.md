@@ -79,6 +79,47 @@ Depois, defina as env vars nesse servidor MCP (`claude mcp add` aceita `--env`, 
 }
 ```
 
+## Transporte HTTP (produção, sem STDIO local)
+
+Além do STDIO (`php artisan mcp:serve`, rodado localmente como subprocesso), este servidor também responde ao protocolo MCP via HTTP, direto no mesmo deploy Railway já existente — sem subir serviço novo. Rota: `POST /api/mcp`.
+
+Use isso quando quiser apontar um cliente MCP direto pra produção, sem rodar nada localmente.
+
+### Autenticação
+
+Token dedicado, **não** é o Sanctum de usuário nem o `ERP_API_TOKEN` (aquele autentica ESTE servidor contra a API do MiniERP; este autentica QUEM pode falar com o servidor MCP). Header `Authorization: Bearer <MCP_HTTP_TOKEN>`.
+
+Gerar um token novo:
+
+```bash
+openssl rand -hex 32
+```
+
+Definir no Railway: no serviço do backend, aba de variáveis de ambiente, adicionar `MCP_HTTP_TOKEN` com o valor gerado. Não precisa de redeploy de código — só a env var.
+
+**Aviso de segurança**: essa rota fica exposta no mesmo domínio público do Railway. Trate o `MCP_HTTP_TOKEN` como segredo (não commitar, não logar). Se vazar, gere um novo com o comando acima e troque a env var no Railway — isso invalida o antigo imediatamente, sem precisar de nenhuma outra ação.
+
+### Rate limit
+
+30 requisições/minuto por IP (`throttle:mcp`, ver `app/Providers/AppServiceProvider.php`). Read-only, mas ainda consulta dado real — o limite existe pra não virar vetor de abuso.
+
+### Registrar no Claude Code / Claude Desktop (via HTTP)
+
+```json
+{
+  "mcpServers": {
+    "erp-mcp-php-http": {
+      "url": "https://laravel-production-4c67.up.railway.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <seu-MCP_HTTP_TOKEN-aqui>"
+      }
+    }
+  }
+}
+```
+
+(Formato de config HTTP varia por cliente MCP — confira a documentação do seu cliente pro campo exato de headers customizados; alguns aceitam `headers` direto na entrada do servidor, outros pedem uma flag de linha de comando equivalente.)
+
 ## Tools disponíveis
 
 Uma tool por endpoint `GET` de `docs/openapi.yaml` — mesmo escopo do servidor Node:
@@ -131,6 +172,8 @@ Hoje existem **dois** servidores MCP equivalentes pra este backend:
 
 - **Node** (`../ERP-MCP`) — feito primeiro, antes de existir um SDK oficial de MCP em PHP.
 - **PHP** (aqui, `app/Mcp/` + `php artisan mcp:serve`) — adicionado depois, por conveniência de ter um único toolchain (PHP) pra manter.
+
+(O servidor PHP em si também tem dois *transportes* — STDIO local e HTTP em produção, ver a seção "Transporte HTTP" acima — isso é ortogonal à distinção Node/PHP: são dois eixos diferentes.)
 
 Os dois devem continuar em paridade de escopo (mesmas tools, mesmo comportamento read-only) até decisão em contrário. **Não adicione tools de escrita casualmente em nenhum dos dois** — nem "só uma tool de escrita simples" — sem revisar deliberadamente as implicações de segurança (confirmação explícita, capability flag, revisão separada).
 
