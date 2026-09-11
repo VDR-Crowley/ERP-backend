@@ -38,5 +38,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('password-reset', function (Request $request) {
             return Limit::perMinute(3)->by($request->ip().'|'.$request->input('email'));
         });
+
+        // MCP HTTP: read-only, mas ainda consulta dado real — throttle básico
+        // por IP pra não virar vetor de abuso mesmo sendo GET-only por baixo.
+        RateLimiter::for('mcp', function (Request $request) {
+            return Limit::perMinute(30)->by($request->ip());
+        });
     }
 }
