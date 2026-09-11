@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\FeedStockController;
 use App\Http\Controllers\Api\FlockCleaningController;
 use App\Http\Controllers\Api\FlockController;
 use App\Http\Controllers\Api\FlockIncubationController;
+use App\Http\Controllers\Api\McpHttpController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\StockTransferController;
@@ -24,6 +25,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:login');
+
+// Servidor MCP via HTTP — autenticação própria (mcp.http-token), NÃO Sanctum
+// de usuário. Ver docs/MCP.md "Transporte HTTP".
+Route::post('mcp', McpHttpController::class)->middleware(['mcp.http-token', 'throttle:mcp']);
 
 Route::post('/password/forgot', [PasswordResetController::class, 'requestCode'])->middleware('throttle:password-reset');
 Route::post('/password/verify-code', [PasswordResetController::class, 'verifyCode'])->middleware('throttle:password-reset');

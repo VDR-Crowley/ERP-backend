@@ -32,5 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="ERP_API_BASE_URL" value="https://mcp-test.example/api"/>
+        <env name="ERP_API_TOKEN" value="test-token-123"/>
+        <env name="MCP_HTTP_TOKEN" value="test-mcp-http-token-456"/>
     </php>
 </phpunit>
