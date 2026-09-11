@@ -128,4 +128,25 @@ class McpServerFactoryTest extends TestCase
         $this->assertSame([['id' => 1]], $result);
         Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales');
     }
+
+    public function test_build_stateless_protocol_registers_the_same_29_tools(): void
+    {
+        $factory = new McpServerFactory(new ErpApiClient());
+        $protocol = $factory->buildStatelessProtocol();
+
+        $this->assertInstanceOf(\Mcp\Server\Stateless\StatelessProtocol::class, $protocol);
+
+        $tools = $factory->registry()->getTools();
+        $this->assertCount(29, $tools);
+    }
+
+    public function test_build_still_returns_a_server_with_29_tools_after_refactor(): void
+    {
+        // Regression guard for the registerTools() extraction: build() must
+        // keep behaving exactly as before.
+        $factory = new McpServerFactory(new ErpApiClient());
+        $factory->build();
+
+        $this->assertCount(29, $factory->registry()->getTools());
+    }
 }

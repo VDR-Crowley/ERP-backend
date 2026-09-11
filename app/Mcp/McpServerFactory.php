@@ -6,16 +6,23 @@ use Mcp\Capability\Registry;
 use Mcp\Schema\Tool;
 use Mcp\Schema\ToolAnnotations;
 use Mcp\Server;
+use Mcp\Server\Builder;
+use Mcp\Server\Stateless\StatelessProtocol;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 
 /**
- * Monta o `Mcp\Server` a partir de `ToolDefinitions` — um par
- * `Mcp\Schema\Tool` + `App\Mcp\ToolHandler` por entrada, registrado via
- * `Builder::add()` num `Registry` próprio (via `setRegistry()`) pra ficar
- * inspecionável nos testes depois de `build()`.
+ * Monta o `Mcp\Server` (STDIO) ou o `Mcp\Server\Stateless\StatelessProtocol`
+ * (HTTP) a partir de `ToolDefinitions` — um par `Mcp\Schema\Tool` +
+ * `App\Mcp\ToolHandler` por entrada, registrado via `Builder::add()` num
+ * `Registry` próprio (via `setRegistry()`) pra ficar inspecionável nos testes.
+ *
+ * Os dois transportes (`php artisan mcp:serve` via `build()`, `POST /api/mcp`
+ * via `buildStatelessProtocol()`) reusam a MESMA configuração de tools —
+ * `registerTools()` é a única fonte de verdade de como as 29 tools viram
+ * elementos do SDK. `build()` continua com o mesmo comportamento de antes.
  *
  * `Builder::add()` e não `addTool()`: ver o docblock de `ToolHandler` — o
  * `addTool()` faz o `ReferenceHandler` mapear os argumentos JSON-RPC nos
@@ -30,6 +37,21 @@ final class McpServerFactory
 
     public function build(): Server
     {
+        $builder = $this->newBuilder();
+
+        return $builder->build();
+    }
+
+    /** Contraparte HTTP de `build()` — mesma config de tools, protocolo stateless (SEP-2575). */
+    public function buildStatelessProtocol(): StatelessProtocol
+    {
+        $builder = $this->newBuilder();
+
+        return $builder->buildStateless();
+    }
+
+    private function newBuilder(): Builder
+    {
         $registry = new Registry;
         $this->registry = $registry;
 
@@ -38,6 +60,13 @@ final class McpServerFactory
             ->setLogger($this->makeLogger())
             ->setRegistry($registry);
 
+        $this->registerTools($builder);
+
+        return $builder;
+    }
+
+    private function registerTools(Builder $builder): void
+    {
         foreach (ToolDefinitions::all() as $def) {
             $builder->add(
                 new Tool(
@@ -55,8 +84,6 @@ final class McpServerFactory
                 new ToolHandler($def, $this->apiClient),
             );
         }
-
-        return $builder->build();
     }
 
     /**
@@ -69,10 +96,10 @@ final class McpServerFactory
         return new Logger('erp-mcp-php', [new StreamHandler('php://stderr', Level::Warning)]);
     }
 
-    /** Só disponível depois de `build()` — usado pra inspecionar o que foi registrado. */
+    /** Só disponível depois de `build()`/`buildStatelessProtocol()` — usado pra inspecionar o que foi registrado. */
     public function registry(): Registry
     {
-        return $this->registry ?? throw new \LogicException('Chame build() antes de registry().');
+        return $this->registry ?? throw new \LogicException('Chame build() ou buildStatelessProtocol() antes de registry().');
     }
 
     /**
