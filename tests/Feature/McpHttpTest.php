@@ -6,6 +6,9 @@ use Tests\TestCase;
 
 class McpHttpTest extends TestCase
 {
+    /** URL pública real do deploy no Railway — ver docs/MCP.md "Transporte HTTP". */
+    private const PRODUCTION_URL = 'https://laravel-production-4c67.up.railway.app/api/mcp';
+
     private const HEADERS_BASE = [
         'Accept' => 'application/json, text/event-stream',
         'MCP-Protocol-Version' => '2026-07-28',
@@ -80,6 +83,52 @@ class McpHttpTest extends TestCase
         // tool" genérico.
         $this->assertTrue($response->json('result.isError'));
         $this->assertStringContainsString('ERP_API_TOKEN', $response->json('result.content.0.text'));
+    }
+
+    /**
+     * Regressão: os outros testes postam no caminho relativo `/api/mcp`, o que
+     * faz o Host virar `localhost` (via APP_URL do ambiente de teste) — e
+     * `localhost` está na allowlist padrão do
+     * `DnsRebindingProtectionMiddleware` do SDK. Com isso a suíte inteira ficava
+     * verde enquanto TODA requisição real no Railway levava
+     * `403 Forbidden: Invalid Host header.` (texto puro, nem JSON-RPC).
+     *
+     * Este teste posta na URL ABSOLUTA de produção justamente pra o header Host
+     * ser o de verdade. Se alguém reintroduzir a middleware padrão do SDK sem
+     * allowlist adequada, isto quebra.
+     */
+    public function test_accepts_requests_with_the_real_production_host_header(): void
+    {
+        $response = $this->withHeaders(self::HEADERS_BASE + [
+            'Mcp-Method' => 'server/discover',
+            'Authorization' => 'Bearer '.config('mcp.http_token'),
+        ])->postJson(self::PRODUCTION_URL, $this->discoverBody());
+
+        $this->assertSame(
+            'laravel-production-4c67.up.railway.app',
+            $response->baseRequest->getHost(),
+            'O teste precisa mesmo sair com o Host de produção, senão não prova nada.'
+        );
+
+        $response->assertOk();
+        $this->assertSame('erp-mcp-php', $response->json('result._meta')['io.modelcontextprotocol/serverInfo']['name']);
+    }
+
+    /**
+     * Mesma proteção, pelo outro caminho da middleware do SDK: quando existe
+     * header `Origin` (cliente MCP rodando em browser), é o Origin que é
+     * checado contra a allowlist, não o Host. CORS de verdade fica com o
+     * `HandleCors` do Laravel (config/cors.php), não com o SDK.
+     */
+    public function test_accepts_requests_carrying_an_origin_header(): void
+    {
+        $response = $this->withHeaders(self::HEADERS_BASE + [
+            'Mcp-Method' => 'server/discover',
+            'Authorization' => 'Bearer '.config('mcp.http_token'),
+            'Origin' => 'https://claude.ai',
+        ])->postJson(self::PRODUCTION_URL, $this->discoverBody());
+
+        $response->assertOk();
     }
 
     public function test_rate_limit_returns_429_after_the_configured_number_of_requests(): void
