@@ -20,7 +20,13 @@ class AuthenticateMcpHttp
         $configured = config('mcp.http_token');
         $provided = $request->bearerToken();
 
-        if (empty($configured) || empty($provided) || ! hash_equals((string) $configured, (string) $provided)) {
+        // `empty()` não serve aqui: `empty('0')` é true, então um token
+        // literalmente igual a "0" daria 401 pra sempre mesmo estando
+        // configurado. Checagem explícita de null/string vazia.
+        $missing = $configured === null || $configured === ''
+            || $provided === null || $provided === '';
+
+        if ($missing || ! hash_equals((string) $configured, (string) $provided)) {
             return response()->json([
                 'message' => 'Token de acesso ao MCP HTTP ausente ou inválido.',
             ], 401);

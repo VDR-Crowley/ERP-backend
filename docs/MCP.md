@@ -103,12 +103,15 @@ Definir no Railway: no serviço do backend, aba de variáveis de ambiente, adici
 
 30 requisições/minuto por IP (`throttle:mcp`, ver `app/Providers/AppServiceProvider.php`). Read-only, mas ainda consulta dado real — o limite existe pra não virar vetor de abuso.
 
+**Na prática, hoje, esse limite é um orçamento único do endpoint inteiro, não por chamador.** Atrás do proxy de borda do Railway e sem trusted proxies configurados (`bootstrap/app.php`), `$request->ip()` resolve pro endereço do proxy pra todo mundo — ou seja, todos os clientes dividem o mesmo balde de 30/min. Mesma situação dos limiters `login` e `password-reset`, que são anteriores a isto. Corrigir de verdade exige configurar trusted proxies com o escopo certo (`at: '*'` deixaria o `X-Forwarded-For` ser forjado de fora, o que é pior que o problema atual) — mudança de infra, deliberada e revisada à parte.
+
 ### Registrar no Claude Code / Claude Desktop (via HTTP)
 
 ```json
 {
   "mcpServers": {
     "erp-mcp-php-http": {
+      "type": "http",
       "url": "https://laravel-production-4c67.up.railway.app/api/mcp",
       "headers": {
         "Authorization": "Bearer <seu-MCP_HTTP_TOKEN-aqui>"
@@ -118,7 +121,9 @@ Definir no Railway: no serviço do backend, aba de variáveis de ambiente, adici
 }
 ```
 
-(Formato de config HTTP varia por cliente MCP — confira a documentação do seu cliente pro campo exato de headers customizados; alguns aceitam `headers` direto na entrada do servidor, outros pedem uma flag de linha de comando equivalente.)
+O `"type": "http"` não é opcional: é ele que diz ao cliente que esta entrada é um servidor remoto por URL, e não o formato `"command"`/`"args"` usado pelo STDIO acima. Sem ele, cliente nenhum sabe o que fazer com a entrada.
+
+(O resto do formato varia por cliente MCP — confira a documentação do seu cliente pro campo exato de headers customizados; alguns aceitam `headers` direto na entrada do servidor, outros pedem uma flag de linha de comando equivalente.)
 
 ## Tools disponíveis
 
