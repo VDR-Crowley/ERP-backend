@@ -2,11 +2,11 @@
 
 namespace Tests\Unit\Mcp;
 
-use App\Mcp\ErpApiClient;
 use App\Mcp\McpServerFactory;
 use App\Mcp\ToolDefinitions;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Http;
+use App\Models\Product;
+use App\Models\Sale;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mcp\Capability\Registry\ReferenceHandler;
 use Mcp\Exception\ToolCallException;
 use Mcp\Server\Session\InMemorySessionStore;
@@ -16,6 +16,8 @@ use Tests\TestCase;
 
 class McpServerFactoryTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * Invoca uma tool registrada do jeito que o SDK invoca em runtime: pelo
      * `ReferenceHandler`, com o bag de argumentos + `_session`, como o
@@ -37,7 +39,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_registers_exactly_29_tools_with_expected_names(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $tools = $factory->registry()->getTools();
@@ -51,7 +53,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_get_sale_tool_requires_integer_sale_id(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $tool = $factory->registry()->getTool('get_sale')->tool;
@@ -62,7 +64,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_get_business_line_report_tool_has_optional_start_end(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $tool = $factory->registry()->getTool('get_business_line_report')->tool;
@@ -74,7 +76,7 @@ class McpServerFactoryTest extends TestCase
 
     public function test_tool_annotations_mark_read_only(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $annotations = $factory->registry()->getTool('list_sales')->tool->annotations;
@@ -85,54 +87,44 @@ class McpServerFactoryTest extends TestCase
         $this->assertFalse($annotations->openWorldHint);
     }
 
-    public function test_tool_handler_calls_the_api_client_and_returns_its_result(): void
+    public function test_tool_handler_reads_the_real_record_via_eloquent(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response(['id' => 42, 'total' => 10.5], 200)]);
+        $product = Product::factory()->create();
 
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
-        $result = $this->callTool($factory, 'get_sale', ['sale' => 42]);
+        $result = $this->callTool($factory, 'get_product', ['product' => $product->id]);
 
-        $this->assertSame(['id' => 42, 'total' => 10.5], $result);
-        Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales/42');
+        $this->assertSame($product->id, $result['id']);
+        $this->assertSame($product->name, $result['name']);
     }
 
-    public function test_tool_handler_wraps_api_errors_as_tool_call_exception(): void
+    public function test_tool_handler_wraps_not_found_as_tool_call_exception(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response(['message' => 'No query results for model.'], 404)]);
-
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $this->expectException(ToolCallException::class);
-        $this->expectExceptionMessageMatches('/No query results for model\./');
 
-        $this->callTool($factory, 'get_sale', ['sale' => 999]);
+        $this->callTool($factory, 'get_product', ['product' => 999999]);
     }
 
-    public function test_zero_arg_tool_reaches_the_api_client_through_the_sdk_invocation_path(): void
+    public function test_zero_arg_tool_reaches_the_data_reader_through_the_sdk_invocation_path(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response([['id' => 1]], 200)]);
+        Sale::factory()->create();
 
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $result = $this->callTool($factory, 'list_sales', []);
 
-        $this->assertSame([['id' => 1]], $result);
-        Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales');
+        $this->assertCount(1, $result);
     }
 
     public function test_build_stateless_protocol_registers_the_same_29_tools(): void
     {
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $protocol = $factory->buildStatelessProtocol();
 
         $this->assertInstanceOf(StatelessProtocol::class, $protocol);
@@ -145,7 +137,7 @@ class McpServerFactoryTest extends TestCase
     {
         // Regression guard for the registerTools() extraction: build() must
         // keep behaving exactly as before.
-        $factory = new McpServerFactory(new ErpApiClient);
+        $factory = app(McpServerFactory::class);
         $factory->build();
 
         $this->assertCount(29, $factory->registry()->getTools());

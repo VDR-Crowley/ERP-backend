@@ -7,7 +7,9 @@ use Mcp\Server\ClientGateway;
 use Mcp\Server\Handler\ToolHandlerInterface;
 
 /**
- * Executa uma entrada de `ToolDefinitions` como um GET na API do MiniERP.
+ * Executa uma entrada de `ToolDefinitions` como uma leitura direta via
+ * `ErpDataReader` (Eloquent, mesmo processo — ver ADR em docs/MCP.md pra por
+ * que isto não é mais um GET HTTP na própria API).
  *
  * Uma instância por tool, pareada com um `Mcp\Schema\Tool` via
  * `Mcp\Server\Builder::add()` — o caminho "explícito" do SDK, pra elementos
@@ -28,7 +30,7 @@ final class ToolHandler implements ToolHandlerInterface
      */
     public function __construct(
         private readonly array $definition,
-        private readonly ErpApiClient $apiClient,
+        private readonly ErpDataReader $reader,
     ) {}
 
     /**
@@ -48,15 +50,17 @@ final class ToolHandler implements ToolHandlerInterface
         }
 
         try {
-            return $this->apiClient->get($this->definition['path'], $pathParams, $query);
+            return $this->reader->read($this->definition['name'], $pathParams, $query);
         } catch (\LogicException|\Error $e) {
-            // Bug no código (ex.: a guarda GET-only do ErpApiClient), não input do
-            // usuário: deixa subir pro SDK virar -32603 + log de erro, em vez de
-            // virar uma mensagem de tool "normal" indistinguível de erro da API.
+            // Bug no código (ex.: tool sem braço mapeado em ErpDataReader), não
+            // input do usuário: deixa subir pro SDK virar -32603 + log de erro,
+            // em vez de virar uma mensagem de tool "normal" indistinguível de
+            // erro de dado.
             throw $e;
         } catch (\Throwable $e) {
-            // Erro real da API/rede/token: o cliente MCP recebe isError: true com
-            // a mensagem de verdade.
+            // Erro real de dado (não encontrado, validação) ou tool sem suporte
+            // nesta transporte (get_current_user): o cliente MCP recebe
+            // isError: true com a mensagem de verdade.
             throw new ToolCallException($e->getMessage(), previous: $e);
         }
     }

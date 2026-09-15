@@ -9,17 +9,6 @@ namespace App\Mcp;
  */
 final class McpConfig
 {
-    public static function resolveBaseUrl(?string $envBaseUrl, ?string $appUrl): string
-    {
-        $trimmedEnv = $envBaseUrl !== null ? trim($envBaseUrl) : '';
-
-        $raw = $trimmedEnv !== ''
-            ? $trimmedEnv
-            : rtrim((string) $appUrl, '/').'/api';
-
-        return rtrim($raw, '/');
-    }
-
     public static function resolveToken(?string $envToken): ?string
     {
         $trimmed = $envToken !== null ? trim($envToken) : '';

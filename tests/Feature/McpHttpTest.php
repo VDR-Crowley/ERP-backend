@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class McpHttpTest extends TestCase
 {
+    use RefreshDatabase;
+
     /** URL pública real do deploy no Railway — ver docs/MCP.md "Transporte HTTP". */
     private const PRODUCTION_URL = 'https://laravel-production-4c67.up.railway.app/api/mcp';
 
@@ -58,31 +61,20 @@ class McpHttpTest extends TestCase
 
     public function test_tools_call_round_trip_surfaces_real_error_not_generic_failure(): void
     {
-        // phpunit.xml configura ERP_API_TOKEN='test-token-123' pros outros testes
-        // (ErpApiClientTest etc., que usam Http::fake). Sem isso forçado pra null
-        // aqui, a chamada real do list_sales sai pra rede de verdade (DNS falha
-        // pra "mcp-test.example") — o que também prova que o erro real chega
-        // (cURL error 6 embrulhado em ApiUnreachableException), só que não com
-        // o texto "ERP_API_TOKEN". Forçamos `mcp.token` pra null pra exercitar
-        // deterministicamente o caminho de token ausente (MissingTokenException),
-        // sem depender de rede — mesma técnica usada em
-        // McpProtocolRoundTripTest::test_missing_token_surfaces_as_is_error_not_internal_error.
-        config(['mcp.token' => null]);
-
+        // Prova que um erro real de dado (registro inexistente) chega como
+        // result.isError + mensagem de verdade, não um -32603/"Error while
+        // executing tool" genérico — mesmo sem precisar de rede/token de API
+        // agora que a leitura é direta via Eloquent (ErpDataReader).
         $response = $this->withHeaders(self::HEADERS_BASE + [
             'Mcp-Method' => 'tools/call',
-            'Mcp-Name' => 'list_sales',
+            'Mcp-Name' => 'get_product',
             'Authorization' => 'Bearer '.config('mcp.http_token'),
-        ])->postJson('/api/mcp', $this->toolCallBody('list_sales', []));
+        ])->postJson('/api/mcp', $this->toolCallBody('get_product', ['product' => 999999]));
 
         $response->assertOk();
 
-        // Formato real observado (confirmado rodando o teste, ver task-6-report.md):
-        // result.isError === true e result.content[0].text carrega a mensagem
-        // real do MissingTokenException — não um -32603/"Error while executing
-        // tool" genérico.
         $this->assertTrue($response->json('result.isError'));
-        $this->assertStringContainsString('ERP_API_TOKEN', $response->json('result.content.0.text'));
+        $this->assertStringContainsString('No query results for model', $response->json('result.content.0.text'));
     }
 
     /**
