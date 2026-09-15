@@ -2,10 +2,9 @@
 
 namespace Tests\Unit\Mcp;
 
-use App\Mcp\ErpApiClient;
 use App\Mcp\McpServerFactory;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Http;
+use App\Models\Sale;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mcp\Server\Transport\StdioTransport;
 use Tests\TestCase;
 
@@ -23,6 +22,8 @@ use Tests\TestCase;
  */
 class McpProtocolRoundTripTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * @param  list<array<string, mixed>>  $requests
      * @return list<array<string, mixed>> respostas JSON-RPC decodificadas
@@ -43,7 +44,7 @@ class McpProtocolRoundTripTest extends TestCase
         $input = fopen($inputPath, 'r');
         $output = fopen($outputPath, 'w');
 
-        (new McpServerFactory(new ErpApiClient))->build()->run(new StdioTransport($input, $output));
+        app(McpServerFactory::class)->build()->run(new StdioTransport($input, $output));
 
         $raw = (string) file_get_contents($outputPath);
         @unlink($inputPath);
@@ -92,32 +93,29 @@ class McpProtocolRoundTripTest extends TestCase
         $this->fail('Nenhuma resposta JSON-RPC com id '.$id.' — recebido: '.json_encode($messages));
     }
 
-    public function test_tools_call_with_path_param_returns_the_api_payload(): void
+    public function test_tools_call_with_path_param_returns_the_real_record(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response(['id' => 42, 'total' => 10.5], 200)]);
+        $sale = Sale::factory()->create(['total' => 10.5]);
 
         $messages = $this->roundTrip($this->withHandshake([[
             'jsonrpc' => '2.0',
             'id' => 2,
             'method' => 'tools/call',
-            'params' => ['name' => 'get_sale', 'arguments' => ['sale' => 42]],
+            'params' => ['name' => 'get_sale', 'arguments' => ['sale' => $sale->id]],
         ]]));
 
         $response = $this->findById($messages, 2);
 
         $this->assertArrayNotHasKey('error', $response, 'tools/call devolveu erro JSON-RPC: '.json_encode($response));
         $this->assertNotTrue($response['result']['isError'] ?? false, 'tools/call devolveu isError: '.json_encode($response));
-        $this->assertSame(['id' => 42, 'total' => 10.5], json_decode($response['result']['content'][0]['text'], true));
-        Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales/42');
+        $payload = json_decode($response['result']['content'][0]['text'], true);
+        $this->assertSame($sale->id, $payload['id']);
+        $this->assertSame('10.50', $payload['total']);
     }
 
-    public function test_tools_call_without_arguments_reaches_the_api_client(): void
+    public function test_tools_call_without_arguments_reaches_the_data_reader(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response([['id' => 1]], 200)]);
+        Sale::factory()->create();
 
         $messages = $this->roundTrip($this->withHandshake([[
             'jsonrpc' => '2.0',
@@ -130,46 +128,44 @@ class McpProtocolRoundTripTest extends TestCase
 
         $this->assertArrayNotHasKey('error', $response, 'tools/call devolveu erro JSON-RPC: '.json_encode($response));
         $this->assertNotTrue($response['result']['isError'] ?? false, 'tools/call devolveu isError: '.json_encode($response));
-        Http::assertSent(fn ($request) => $request->url() === 'https://mcp-test.example/api/sales');
+        $payload = json_decode($response['result']['content'][0]['text'], true);
+        $this->assertCount(1, $payload);
     }
 
-    public function test_api_error_surfaces_as_is_error_with_the_real_message(): void
+    public function test_not_found_surfaces_as_is_error_with_the_real_message(): void
     {
-        Config::set('mcp.token', 'abc123');
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-        Http::fake(['*' => Http::response(['message' => 'No query results for model.'], 404)]);
-
         $messages = $this->roundTrip($this->withHandshake([[
             'jsonrpc' => '2.0',
             'id' => 4,
             'method' => 'tools/call',
-            'params' => ['name' => 'get_sale', 'arguments' => ['sale' => 999]],
+            'params' => ['name' => 'get_sale', 'arguments' => ['sale' => 999999]],
         ]]));
 
         $response = $this->findById($messages, 4);
 
         $this->assertArrayNotHasKey('error', $response, 'esperava isError, veio erro JSON-RPC: '.json_encode($response));
         $this->assertTrue($response['result']['isError']);
-        $this->assertStringContainsString('No query results for model.', $response['result']['content'][0]['text']);
+        $this->assertStringContainsString('No query results for model', $response['result']['content'][0]['text']);
     }
 
-    public function test_missing_token_surfaces_as_is_error_not_internal_error(): void
+    public function test_get_current_user_surfaces_as_is_error_not_internal_error(): void
     {
-        Config::set('mcp.token', null);
-        Config::set('mcp.base_url', 'https://mcp-test.example/api');
-
+        // `get_current_user` não tem sentido nesta transporte (leitura direta
+        // via Eloquent, sem token de usuário) — ver ErpDataReader. Continua
+        // registrada (parity de nomes com o servidor Node), mas sempre
+        // recusa com uma mensagem clara, nunca -32603.
         $messages = $this->roundTrip($this->withHandshake([[
             'jsonrpc' => '2.0',
             'id' => 5,
             'method' => 'tools/call',
-            'params' => ['name' => 'list_sales', 'arguments' => new \stdClass],
+            'params' => ['name' => 'get_current_user', 'arguments' => new \stdClass],
         ]]));
 
         $response = $this->findById($messages, 5);
 
         $this->assertArrayNotHasKey('error', $response, 'esperava isError, veio erro JSON-RPC: '.json_encode($response));
         $this->assertTrue($response['result']['isError']);
-        $this->assertStringContainsString('ERP_API_TOKEN', $response['result']['content'][0]['text']);
+        $this->assertStringContainsString('get_current_user', $response['result']['content'][0]['text']);
     }
 
     public function test_tools_list_advertises_the_29_tools(): void

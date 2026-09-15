@@ -33,7 +33,7 @@ final class McpServerFactory
 {
     private ?Registry $registry = null;
 
-    public function __construct(private readonly ErpApiClient $apiClient) {}
+    public function __construct(private readonly ErpDataReader $reader) {}
 
     public function build(): Server
     {
@@ -81,7 +81,7 @@ final class McpServerFactory
                         openWorldHint: false,
                     ),
                 ),
-                new ToolHandler($def, $this->apiClient),
+                new ToolHandler($def, $this->reader),
             );
         }
     }

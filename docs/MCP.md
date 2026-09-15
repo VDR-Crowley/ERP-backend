@@ -8,6 +8,12 @@ Já existe um servidor MCP equivalente em Node/TypeScript, `../ERP-MCP` — feit
 
 **Ver [nota de segurança](#dois-servidores-mcp-pra-este-backend) no fim — leia antes de mexer em qualquer um dos dois.**
 
+### ADR: leitura direta via Eloquent, não HTTP na própria API
+
+Versão original deste servidor (porte 1:1 do Node) fazia cada tool chamar a própria API via HTTP (`Illuminate\Support\Facades\Http`), autenticada com um token Sanctum de usuário real (`ERP_API_TOKEN`, expira em 2h). Isso fazia sentido no Node — processo separado, sem acesso ao Eloquent — mas nunca fez sentido aqui: o servidor PHP roda dentro do MESMO processo/deploy Laravel, com a mesma conexão de banco já disponível. O round-trip HTTP era indireção pura, herdada do porte sem repensar, e criava uma dependência real: automação (o próprio propósito do MCP) ficava presa a um humano logar de novo a cada 2h.
+
+Fix: `App\Mcp\ErpDataReader` lê direto via Eloquent (mesmos Models/Services que os Controllers da API usam), sem HTTP, sem `ERP_API_TOKEN`. `ErpApiClient` foi removido. O gate de acesso que continua sendo o real — quem pode falar com o servidor MCP — é o `MCP_HTTP_TOKEN` (transporte HTTP) ou o processo local (STDIO); nenhum dos dois nunca dependeu do Sanctum de usuário pra decidir isso.
+
 ## Instalar
 
 ```bash
@@ -18,49 +24,19 @@ composer install
 
 ## Configurar
 
-Duas env vars, no `.env` deste projeto (ou exportadas no shell/config do cliente MCP):
+Nada a configurar pro STDIO local: as tools leem direto do banco que o próprio `.env` deste projeto já aponta (mesma `DB_CONNECTION` de sempre). Não existe mais `ERP_API_TOKEN`/`ERP_API_BASE_URL` — ver [ADR acima](#adr-leitura-direta-via-eloquent-não-http-na-própria-api).
 
-| Variável | Obrigatória | Default | Significado |
-|---|---|---|---|
-| `ERP_API_BASE_URL` | não | `APP_URL` local + `/api` | Base da API do MiniERP, sem barra final |
-| `ERP_API_TOKEN` | sim | — | Token de acesso Sanctum, enviado como `Authorization: Bearer <token>` |
-
-Pra usar contra a **produção**:
-
-```env
-ERP_API_BASE_URL=https://laravel-production-4c67.up.railway.app/api
-ERP_API_TOKEN=<obtido via POST https://laravel-production-4c67.up.railway.app/api/login>
-```
-
-### Como obter um token
-
-Não existe hoje comando artisan nem fluxo admin que emita um token read-only dedicado — a única emissão de token é via login. Contra produção:
-
-```bash
-curl -X POST https://laravel-production-4c67.up.railway.app/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"voce@example.com","password":"sua-senha"}'
-```
-
-A resposta traz um `access_token` (ability `access`, **expira em 2h**) e um `refresh_token` (ability `refresh`, expira em 30 dias, roda a cada uso). Copie o valor de `access_token` pra `ERP_API_TOKEN`.
-
-Ressalvas honestas (mesmas do README do Node):
-
-- O token expira em 2h — espere ter que logar de novo periodicamente; este servidor não tem fluxo de refresh automático.
-- **Não existe token com escopo read-only na API.** A ability `access` cobre toda rota que o usuário autenticado alcança, GET e escrita. Este servidor nunca emite escrita independente do token — mas o token em si não é restrito a leitura na camada da API. O limite read-only é garantido só na camada MCP (`ErpApiClient` recusa qualquer verbo != GET), não na camada API/token.
-- Se um token com escopo restrito de verdade for necessário no futuro, isso é mudança de backend (ex.: comando artisan que emite uma ability `readonly` nova, checada por middleware de rota novo) — não algo pra simular aqui.
+Só o transporte HTTP (produção) precisa de config — `MCP_HTTP_TOKEN`, ver a seção "Transporte HTTP" abaixo.
 
 ## Registrar no Claude Code / Claude Desktop
 
-Aponta pro comando artisan, com as env vars setadas (exemplo já usando a base de produção):
-
-**Claude Code:**
+**Claude Code (STDIO local):**
 
 ```bash
 claude mcp add erp-mcp-php -- php /caminho/absoluto/para/ERP-Backend/artisan mcp:serve
 ```
 
-Depois, defina as env vars nesse servidor MCP (`claude mcp add` aceita `--env`, ex. `-e ERP_API_TOKEN=... -e ERP_API_BASE_URL=https://laravel-production-4c67.up.railway.app/api`), ou exporte-as no shell que o Claude Code usa.
+Roda contra o banco que o `.env` local do projeto aponta — sem env var adicional. Pra ler dado de produção, use o transporte HTTP abaixo (ele já roda no deploy real, com o banco real) em vez de apontar o STDIO local pra produção.
 
 **Config JSON cru de cliente MCP:**
 
@@ -69,11 +45,7 @@ Depois, defina as env vars nesse servidor MCP (`claude mcp add` aceita `--env`, 
   "mcpServers": {
     "erp-mcp-php": {
       "command": "php",
-      "args": ["/caminho/absoluto/para/ERP-Backend/artisan", "mcp:serve"],
-      "env": {
-        "ERP_API_BASE_URL": "https://laravel-production-4c67.up.railway.app/api",
-        "ERP_API_TOKEN": "1|seu-token-de-acesso-aqui"
-      }
+      "args": ["/caminho/absoluto/para/ERP-Backend/artisan", "mcp:serve"]
     }
   }
 }
@@ -87,7 +59,7 @@ Use isso quando quiser apontar um cliente MCP direto pra produção, sem rodar n
 
 ### Autenticação
 
-Token dedicado, **não** é o Sanctum de usuário nem o `ERP_API_TOKEN` (aquele autentica ESTE servidor contra a API do MiniERP; este autentica QUEM pode falar com o servidor MCP). Header `Authorization: Bearer <MCP_HTTP_TOKEN>`.
+Token dedicado — quem pode falar com o servidor MCP (não é Sanctum de usuário, não precisa mais de um `ERP_API_TOKEN` interno, ver ADR acima). Header `Authorization: Bearer <MCP_HTTP_TOKEN>`.
 
 Gerar um token novo:
 
@@ -131,7 +103,7 @@ Uma tool por endpoint `GET` de `docs/openapi.yaml` — mesmo escopo do servidor 
 
 | Tool | Descrição |
 |---|---|
-| `get_current_user` | Get the user data for the currently authenticated API token. |
+| `get_current_user` | **Não suportada** — não existe usuário autenticado nesta leitura direta via Eloquent. Sempre recusa com `isError: true` explicando isso; registrada só por paridade de nomes com o servidor Node. Use `list_users`. |
 | `list_users` | List all admin-panel users (not paginated). Excludes the public self-registration flow. |
 | `list_products` | List all products sold (eggs, packaging, etc.). |
 | `get_product` | Get one product by ID. |
@@ -167,9 +139,9 @@ Fonte de verdade: `app/Mcp/ToolDefinitions.php` — essa tabela, não o contrár
 
 Read-only por construção:
 
-- `App\Mcp\ErpApiClient` só expõe `get()`. O `request()` interno recusa qualquer verbo != GET, mesmo que um refactor futuro tente passar outro.
-- Nenhuma tool de escrita é registrada — só endpoints GET viram tool.
-- Se um dia quiser tools de escrita, isso deve ser uma adição deliberada e cuidadosamente escopada (confirmação explícita, capability flag), nunca só relaxar a guarda do client.
+- `App\Mcp\ErpDataReader` só faz leitura (`all()`/`find*()`/queries `->get()`) — nenhum `create`/`update`/`delete` em nenhum braço do `match`.
+- Nenhuma tool de escrita é registrada — só as 29 leituras de `ToolDefinitions` viram tool.
+- Se um dia quiser tools de escrita, isso deve ser uma adição deliberada e cuidadosamente escopada (confirmação explícita, capability flag), nunca só relaxar a guarda do reader.
 
 ## Dois servidores MCP pra este backend
 
@@ -187,7 +159,7 @@ Os dois devem continuar em paridade de escopo (mesmas tools, mesmo comportamento
 ```bash
 php artisan test tests/Unit/Mcp   # só os testes deste servidor
 composer test                     # suíte inteira do backend
-php artisan mcp:serve             # roda localmente (precisa de ERP_API_TOKEN válido pras tools funcionarem)
+php artisan mcp:serve             # roda localmente, contra o banco do .env local — sem token de API
 ```
 
 ### Smoke test manual do protocolo
@@ -205,7 +177,8 @@ printf '%s\n' \
   | php artisan mcp:serve
 ```
 
-Sem token/API acessível, o esperado é `"isError":true` com a mensagem real
-(token faltando, 404, erro de conexão) — nunca `-32603 Error while executing tool`,
-que significa que a tool nem chegou a rodar. O equivalente automatizado disso é
+Se o registro não existir no banco local (`sale:42` num `.env` local sem esse
+dado), o esperado é `"isError":true` com a mensagem real do Eloquent (ex. "No
+query results for model...") — nunca `-32603 Error while executing tool`, que
+significa que a tool nem chegou a rodar. O equivalente automatizado disso é
 `tests/Unit/Mcp/McpProtocolRoundTripTest.php`.
