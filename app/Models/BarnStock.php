@@ -4,29 +4,34 @@ namespace App\Models;
 
 use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['barn_id', 'date', 'quail_eggs', 'chicken_eggs', 'is_mock'])]
-class DailyProduction extends Model
+/** Saldo de estoque de um produto num galpão específico. Ver StockLocationService. */
+#[Fillable(['barn_id', 'product_id', 'quantity', 'is_mock'])]
+class BarnStock extends Model
 {
-    use HasFactory, HasMockFlag;
+    use HasMockFlag;
+
+    protected $table = 'barn_stock';
 
     protected function casts(): array
     {
         return [
             'barn_id' => 'integer',
-            'date' => 'date',
-            'quail_eggs' => 'integer',
-            'chicken_eggs' => 'integer',
+            'product_id' => 'integer',
+            'quantity' => 'integer',
             'is_mock' => 'boolean',
         ];
     }
 
-    /** Galpão (plantel/local) onde essa produção foi registrada. Opcional (legado). */
     public function barn(): BelongsTo
     {
         return $this->belongsTo(Barn::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 }

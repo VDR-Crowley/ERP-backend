@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\DailyProduction;
 
+use App\Models\DailyProduction;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDailyProductionRequest extends FormRequest
@@ -17,9 +18,30 @@ class StoreDailyProductionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'date' => ['required', 'date', 'unique:daily_productions,date'],
+            'barn_id' => ['nullable', 'integer', 'exists:barn,id'],
+            // Unicidade por (data + galpão): 1 lançamento por dia POR galpão.
+            // Comparação por `whereDate` (não `unique:...,date`) porque a coluna
+            // é armazenada como datetime `Y-m-d 00:00:00` — o unique padrão
+            // compararia com a string exata e nunca acharia.
+            'date' => ['required', 'date', $this->uniquePerBarnRule()],
             'quail_eggs' => ['nullable', 'integer', 'min:0'],
             'chicken_eggs' => ['nullable', 'integer', 'min:0'],
         ];
+    }
+
+    private function uniquePerBarnRule(): \Closure
+    {
+        $barnId = $this->input('barn_id');
+
+        return function (string $attribute, mixed $value, \Closure $fail) use ($barnId): void {
+            $exists = DailyProduction::whereDate('date', $value)
+                ->when($barnId === null, fn ($q) => $q->whereNull('barn_id'))
+                ->when($barnId !== null, fn ($q) => $q->where('barn_id', $barnId))
+                ->exists();
+
+            if ($exists) {
+                $fail('Já existe um registro de produção nesse dia para esse galpão.');
+            }
+        };
     }
 }

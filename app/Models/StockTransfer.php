@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'date', 'product_id', 'quantity',
-    'from_location_type', 'from_vendedor_id',
-    'to_location_type', 'to_vendedor_id', 'note', 'is_mock', ])]
+    'from_location_type', 'from_vendedor_id', 'from_location_barn_id',
+    'to_location_type', 'to_vendedor_id', 'to_location_barn_id', 'note', 'is_mock', ])]
 class StockTransfer extends Model
 {
     use HasFactory, HasMockFlag;
@@ -21,6 +21,8 @@ class StockTransfer extends Model
         return [
             'date' => 'date',
             'quantity' => 'integer',
+            'from_location_barn_id' => 'integer',
+            'to_location_barn_id' => 'integer',
             'is_mock' => 'boolean',
         ];
     }

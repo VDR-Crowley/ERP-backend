@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'date', 'product_id', 'quantity', 'unit_price', 'total', 'payment_pending',
     'buyer', 'seller_id', 'delivery_pending', 'delivery_date',
-    'stock_location_type', 'stock_location_vendedor_id', 'is_mock', ])]
+    'stock_location_type', 'stock_location_vendedor_id', 'stock_location_barn_id', 'is_mock', ])]
 class Sale extends Model
 {
     use HasFactory, HasMockFlag;
@@ -27,6 +27,7 @@ class Sale extends Model
             'payment_pending' => 'boolean',
             'delivery_pending' => 'boolean',
             'delivery_date' => 'date',
+            'stock_location_barn_id' => 'integer',
             'is_mock' => 'boolean',
         ];
     }
@@ -44,6 +45,11 @@ class Sale extends Model
     public function stockLocationVendedor(): BelongsTo
     {
         return $this->belongsTo(Vendedor::class, 'stock_location_vendedor_id');
+    }
+
+    public function stockLocationBarn(): BelongsTo
+    {
+        return $this->belongsTo(Barn::class, 'stock_location_barn_id');
     }
 
     public function exclusion(): HasOne

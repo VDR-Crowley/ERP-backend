@@ -2,18 +2,22 @@
 
 namespace App\Services;
 
+use App\Models\BarnStock;
 use App\Models\Product;
 use App\Models\VendorStock;
 
 /**
- * Ajuste de saldo de estoque por local (Plantel ou um Vendedor), porte fiel do
- * `adjustStock` duplicado em `sales.ts`/`stock-transfers.ts` no front. `delta`
- * negativo baixa, positivo devolve/repõe. Não bloqueia estoque negativo — mesmo
- * comportamento lenient do front (ver `stock-location.ts`).
+ * Ajuste de saldo de estoque por local. Três tipos:
+ *  - 'barn'     -> saldo por galpão+produto (barn_stock)
+ *  - 'vendedor' -> saldo por vendedor+produto (vendor_stock)
+ *  - 'plantel'  -> legado: o antigo estoque global (products.stock)
+ *
+ * `delta` negativo baixa, positivo devolve/repõe. Não bloqueia estoque
+ * negativo — mesmo comportamento lenient do front (ver `stock-location.ts`).
  */
 class StockLocationService
 {
-    public function adjust(string $locationType, ?int $vendedorId, Product $product, int $delta): void
+    public function adjust(string $locationType, ?int $vendedorId, ?int $barnId, Product $product, int $delta): void
     {
         if ($delta === 0) {
             return;
@@ -21,6 +25,17 @@ class StockLocationService
 
         if ($locationType === 'plantel') {
             $product->increment('stock', $delta);
+
+            return;
+        }
+
+        if ($locationType === 'barn') {
+            $barnStock = BarnStock::firstOrNew([
+                'barn_id' => $barnId,
+                'product_id' => $product->id,
+            ]);
+            $barnStock->quantity = ($barnStock->quantity ?? 0) + $delta;
+            $barnStock->save();
 
             return;
         }
@@ -34,10 +49,17 @@ class StockLocationService
     }
 
     /** Saldo atual do produto num local, pra validação de saldo suficiente (transferência). */
-    public function quantityAt(string $locationType, ?int $vendedorId, Product $product): int
+    public function quantityAt(string $locationType, ?int $vendedorId, ?int $barnId, Product $product): int
     {
         if ($locationType === 'plantel') {
             return $product->stock;
+        }
+
+        if ($locationType === 'barn') {
+            return BarnStock::query()
+                ->where('barn_id', $barnId)
+                ->where('product_id', $product->id)
+                ->value('quantity') ?? 0;
         }
 
         return VendorStock::query()

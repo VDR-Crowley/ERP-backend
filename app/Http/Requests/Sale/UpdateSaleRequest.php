@@ -27,11 +27,14 @@ class UpdateSaleRequest extends FormRequest
             'seller_id' => ['required', 'integer', 'exists:vendedores,id'],
             'delivery_pending' => ['required', 'boolean'],
             'delivery_date' => ['nullable', 'date'],
-            'stock_location_type' => ['required', 'in:plantel,vendedor'],
+            'stock_location_type' => ['required', 'in:plantel,vendedor,barn'],
             'stock_location_vendedor_id' => [
                 'required_if:stock_location_type,vendedor',
-                'prohibited_if:stock_location_type,plantel',
                 'nullable', 'integer', 'exists:vendedores,id',
+            ],
+            'stock_location_barn_id' => [
+                'required_if:stock_location_type,barn',
+                'nullable', 'integer', 'exists:barn,id',
             ],
         ];
     }

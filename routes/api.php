@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\BusinessLineReportController;
 use App\Http\Controllers\Api\CashFlowController;
+use App\Http\Controllers\Api\BarnController;
 use App\Http\Controllers\Api\DailyProductionController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FeedOpenLogController;
@@ -55,6 +56,9 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::apiResource('vendedores', VendedorController::class)->parameters(['vendedores' => 'vendedor']);
     Route::apiResource('flock', FlockController::class);
 
+    // Galpão (plantel/local físico) — cadastro do local e do que há nele.
+    Route::apiResource('barns', BarnController::class)->parameters(['barns' => 'barn']);
+
     Route::apiResource('flock-incubations', FlockIncubationController::class);
     Route::get('flock-incubations/{flock_incubation}/hatch-events', [FlockIncubationController::class, 'hatchEvents']);
     Route::post('flock-incubations/{flock_incubation}/hatch-events', [FlockIncubationController::class, 'storeHatchEvent']);
@@ -62,6 +66,8 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::delete('flock-incubations/{flock_incubation}/hatch-events/{hatch_event}', [FlockIncubationController::class, 'destroyHatchEvent']);
 
     Route::apiResource('vendor-stock', VendorStockController::class);
+    Route::get('barn-stocks', [\App\Http\Controllers\Api\BarnStockController::class, 'index']);
+    Route::post('barn-stocks', [\App\Http\Controllers\Api\BarnStockController::class, 'store']);
 
     Route::apiResource('sales', SaleController::class);
     Route::post('sales/{sale}/exclusion', [SaleController::class, 'storeExclusion']);

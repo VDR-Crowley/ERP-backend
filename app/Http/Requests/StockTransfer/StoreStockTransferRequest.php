@@ -20,17 +20,23 @@ class StoreStockTransferRequest extends FormRequest
             'date' => ['required', 'date'],
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'from_location_type' => ['required', 'in:plantel,vendedor'],
+            'from_location_type' => ['required', 'in:plantel,vendedor,barn'],
             'from_vendedor_id' => [
                 'required_if:from_location_type,vendedor',
-                'prohibited_if:from_location_type,plantel',
                 'nullable', 'integer', 'exists:vendedores,id',
             ],
-            'to_location_type' => ['required', 'in:plantel,vendedor'],
+            'from_location_barn_id' => [
+                'required_if:from_location_type,barn',
+                'nullable', 'integer', 'exists:barn,id',
+            ],
+            'to_location_type' => ['required', 'in:plantel,vendedor,barn'],
             'to_vendedor_id' => [
                 'required_if:to_location_type,vendedor',
-                'prohibited_if:to_location_type,plantel',
                 'nullable', 'integer', 'exists:vendedores,id',
+            ],
+            'to_location_barn_id' => [
+                'required_if:to_location_type,barn',
+                'nullable', 'integer', 'exists:barn,id',
             ],
             'note' => ['nullable', 'string'],
         ];
@@ -52,7 +58,9 @@ class StoreStockTransferRequest extends FormRequest
             }
 
             $sameLocation = $fromType === $toType
-                && ($fromType === 'plantel' || $this->input('from_vendedor_id') == $this->input('to_vendedor_id'));
+                && ($fromType === 'plantel'
+                    || ($fromType === 'vendedor' && $this->input('from_vendedor_id') == $this->input('to_vendedor_id'))
+                    || ($fromType === 'barn' && $this->input('from_location_barn_id') == $this->input('to_location_barn_id')));
 
             if ($sameLocation) {
                 $validator->errors()->add('to_location_type', 'O destino da transferência não pode ser igual à origem.');

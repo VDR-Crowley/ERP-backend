@@ -27,6 +27,7 @@ class SaleService
             $this->stock->adjust(
                 $sale->stock_location_type,
                 $sale->stock_location_vendedor_id,
+                $sale->stock_location_barn_id,
                 Product::findOrFail($sale->product_id),
                 -$sale->quantity,
             );
@@ -42,17 +43,19 @@ class SaleService
         return DB::transaction(function () use ($sale, $data) {
             $originalLocationType = $sale->stock_location_type;
             $originalLocationVendedorId = $sale->stock_location_vendedor_id;
+            $originalLocationBarnId = $sale->stock_location_barn_id;
             $originalProduct = Product::findOrFail($sale->product_id);
             $originalQuantity = $sale->quantity;
 
             // Desfaz a baixa antiga antes de aplicar a nova.
-            $this->stock->adjust($originalLocationType, $originalLocationVendedorId, $originalProduct, $originalQuantity);
+            $this->stock->adjust($originalLocationType, $originalLocationVendedorId, $originalLocationBarnId, $originalProduct, $originalQuantity);
 
             $sale->update($data);
 
             $this->stock->adjust(
                 $sale->stock_location_type,
                 $sale->stock_location_vendedor_id,
+                $sale->stock_location_barn_id,
                 Product::findOrFail($sale->product_id),
                 -$sale->quantity,
             );
@@ -67,6 +70,7 @@ class SaleService
             $this->stock->adjust(
                 $sale->stock_location_type,
                 $sale->stock_location_vendedor_id,
+                $sale->stock_location_barn_id,
                 Product::findOrFail($sale->product_id),
                 $sale->quantity,
             );
@@ -75,11 +79,15 @@ class SaleService
         });
     }
 
-    /** Garante `stock_location_vendedor_id` nulo quando o local é o Plantel, mesmo que o payload não mande a chave. */
+    /** Zera os ids de local que não correspondem ao tipo escolhido (barn só usa barn_id, vendedor só vendedor_id, plantel nenhum). */
     private function normalizeLocation(array $data): array
     {
-        if (($data['stock_location_type'] ?? null) === 'plantel') {
+        $type = $data['stock_location_type'] ?? null;
+        if ($type !== 'vendedor') {
             $data['stock_location_vendedor_id'] = null;
+        }
+        if ($type !== 'barn') {
+            $data['stock_location_barn_id'] = null;
         }
 
         return $data;

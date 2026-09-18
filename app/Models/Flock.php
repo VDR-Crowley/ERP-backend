@@ -6,8 +6,9 @@ use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['species', 'quantity', 'feed_bags_per_month', 'bag_price', 'monthly_total', 'is_mock'])]
+#[Fillable(['barn_id', 'species', 'quantity', 'feed_bags_per_month', 'bag_price', 'monthly_total', 'is_mock'])]
 class Flock extends Model
 {
     use HasFactory, HasMockFlag;
@@ -18,11 +19,18 @@ class Flock extends Model
     protected function casts(): array
     {
         return [
+            'barn_id' => 'integer',
             'quantity' => 'integer',
             'feed_bags_per_month' => 'integer',
             'bag_price' => 'decimal:2',
             'monthly_total' => 'decimal:2',
             'is_mock' => 'boolean',
         ];
+    }
+
+    /** Galpão (plantel/local) onde este lote vive. Opcional (dado legado pode não ter). */
+    public function barn(): BelongsTo
+    {
+        return $this->belongsTo(Barn::class);
     }
 }

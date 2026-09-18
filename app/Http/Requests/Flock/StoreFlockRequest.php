@@ -17,6 +17,7 @@ class StoreFlockRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'barn_id' => ['nullable', 'integer', 'exists:barn,id'],
             'species' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'min:0'],
             'feed_bags_per_month' => ['required', 'integer', 'min:0'],
