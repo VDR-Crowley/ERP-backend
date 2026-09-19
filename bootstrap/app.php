@@ -42,4 +42,27 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return null;
         });
+
+        // Fallback: alguns caminhos (ex.: UPDATE que colide com outro registro)
+        // sobem um QueryException genérico em vez do UniqueConstraintViolationException.
+        // Detecta pelo SQLSTATE de violação de unicidade (23505 Postgres / 23000
+        // SQLite/MySQL) e também vira 409 limpo em vez de vazar o SQL cru.
+        $exceptions->render(function (\Illuminate\Database\QueryException $e, Request $request) {
+            if (! ($request->is('api/*') || $request->expectsJson())) {
+                return null;
+            }
+            $sqlState = (string) ($e->getCode());
+            $message = $e->getMessage();
+            $isUnique = in_array($sqlState, ['23505', '23000'], true)
+                || str_contains($message, 'Unique violation')
+                || str_contains($message, 'duplicate key value')
+                || str_contains($message, 'UNIQUE constraint failed')
+                || str_contains($message, 'Duplicate entry');
+
+            if ($isUnique) {
+                return response()->json(['message' => 'Já existe um registro com esses dados.'], 409);
+            }
+
+            return null;
+        });
     })->create();
