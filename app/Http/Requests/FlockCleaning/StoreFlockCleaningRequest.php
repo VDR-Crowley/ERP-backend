@@ -17,21 +17,11 @@ class StoreFlockCleaningRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Sem checagem de duplicata aqui: a unicidade fica no banco
+        // (unique date+species+cleaning_type). Duplicata vira 409 (ver
+        // bootstrap/app.php), que o import ignora em vez de falhar.
         return [
-            'date' => [
-                'required', 'date',
-                function ($attribute, $value, $fail): void {
-                    $duplicate = FlockCleaning::query()
-                        ->whereDate('date', $value)
-                        ->where('species', $this->input('species'))
-                        ->where('cleaning_type', $this->input('cleaning_type'))
-                        ->exists();
-
-                    if ($duplicate) {
-                        $fail('Já existe uma higienização com esses dados nesse dia.');
-                    }
-                },
-            ],
+            'date' => ['required', 'date'],
             'species' => ['required', 'in:quail,chicken'],
             'cleaning_type' => ['required', 'in:total,feeder,tray,nest'],
             'notes' => ['nullable', 'string'],

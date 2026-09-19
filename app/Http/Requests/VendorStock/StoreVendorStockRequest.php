@@ -3,7 +3,6 @@
 namespace App\Http\Requests\VendorStock;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreVendorStockRequest extends FormRequest
 {
@@ -17,12 +16,12 @@ class StoreVendorStockRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Sem `unique` em (product_id, vendedor_id): o controller faz
+        // updateOrCreate (upsert), então reenviar o mesmo par atualiza o saldo
+        // em vez de ser barrado — necessário pro import ser idempotente.
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
-            'vendedor_id' => [
-                'required', 'integer', 'exists:vendedores,id',
-                Rule::unique('vendor_stock')->where(fn ($query) => $query->where('product_id', $this->input('product_id'))),
-            ],
+            'vendedor_id' => ['required', 'integer', 'exists:vendedores,id'],
             'quantity' => ['required', 'integer', 'min:0'],
         ];
     }

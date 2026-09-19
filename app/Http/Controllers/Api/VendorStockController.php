@@ -18,7 +18,13 @@ class VendorStockController extends Controller
 
     public function store(StoreVendorStockRequest $request): JsonResponse
     {
-        $vendorStock = VendorStock::create($request->validated());
+        $data = $request->validated();
+        // Upsert por (produto, vendedor): reimportar/atualizar o saldo não
+        // viola o unique(product_id, vendedor_id) nem duplica o registro.
+        $vendorStock = VendorStock::updateOrCreate(
+            ['product_id' => $data['product_id'], 'vendedor_id' => $data['vendedor_id']],
+            ['quantity' => $data['quantity']],
+        );
 
         return response()->json($vendorStock, Response::HTTP_CREATED);
     }

@@ -17,22 +17,11 @@ class StoreExpenseRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Sem checagem de duplicata aqui: a unicidade fica no banco
+        // (unique date+description+category+amount). Duplicata vira 409 (ver
+        // bootstrap/app.php), que o import ignora em vez de falhar.
         return [
-            'date' => [
-                'required', 'date',
-                function ($attribute, $value, $fail): void {
-                    $duplicate = Expense::query()
-                        ->whereDate('date', $value)
-                        ->where('description', $this->input('description'))
-                        ->where('category', $this->input('category'))
-                        ->where('amount', $this->input('amount'))
-                        ->exists();
-
-                    if ($duplicate) {
-                        $fail('Já existe uma despesa com esses dados nesse dia.');
-                    }
-                },
-            ],
+            'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'max:255'],
             'quantity' => ['nullable', 'integer', 'min:0'],

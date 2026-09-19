@@ -32,4 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Violação de unicidade no banco vira 409 (Conflict) em vez de 500 —
+        // o import (import.ts) trata 409 como "já existe, ignora a linha".
+        $exceptions->render(function (\Illuminate\Database\UniqueConstraintViolationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json(['message' => 'Já existe um registro com esses dados.'], 409);
+            }
+
+            return null;
+        });
     })->create();
