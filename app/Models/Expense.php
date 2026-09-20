@@ -6,9 +6,10 @@ use App\Models\Concerns\HasMockFlag;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['date', 'description', 'category', 'quantity', 'unit_price', 'amount', 'paid', 'is_mock'])]
+#[Fillable(['date', 'description', 'category', 'barn_id', 'quantity', 'unit_price', 'amount', 'paid', 'is_mock'])]
 class Expense extends Model
 {
     use HasFactory, HasMockFlag;
@@ -28,5 +29,10 @@ class Expense extends Model
     public function speciesOverride(): HasOne
     {
         return $this->hasOne(ExpenseSpeciesOverride::class);
+    }
+
+    public function barn(): BelongsTo
+    {
+        return $this->belongsTo(Barn::class);
     }
 }

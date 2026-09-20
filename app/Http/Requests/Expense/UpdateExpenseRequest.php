@@ -20,6 +20,7 @@ class UpdateExpenseRequest extends FormRequest
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'max:255'],
+            'barn_id' => ['nullable', 'integer', 'exists:barn,id'],
             'quantity' => ['nullable', 'integer', 'min:0'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['required', 'numeric', 'min:0'],
