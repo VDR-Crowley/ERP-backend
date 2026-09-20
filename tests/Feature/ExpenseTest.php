@@ -28,13 +28,16 @@ class ExpenseTest extends TestCase
             'amount' => 150.00,
         ]);
 
+        // Duplicata exata (date+description+category+amount) vira 409 — o import
+        // (import.ts) trata 409 como "já existe, ignora a linha" em vez de falhar.
+        // Ver bootstrap/app.php (UniqueConstraintViolation -> 409).
         $this->postJson('/api/expenses', [
             'date' => '2026-08-20',
             'description' => 'Ração Codorna',
             'category' => 'Alimentação',
             'amount' => 150.00,
             'paid' => true,
-        ])->assertUnprocessable()->assertJsonValidationErrors('date');
+        ])->assertStatus(409);
 
         $this->assertSame(1, Expense::count());
     }
