@@ -25,7 +25,9 @@ class UpdateVendorStockRequest extends FormRequest
                     ->where(fn ($query) => $query->where('product_id', $this->input('product_id')))
                     ->ignore($this->route('vendor_stock')),
             ],
-            'quantity' => ['required', 'integer', 'min:0'],
+            // Pode ser negativa: saldo devedor do vendedor (vendeu/levou mais do
+            // que recebeu, entrega pendente). Ver StoreVendorStockRequest.
+            'quantity' => ['required', 'integer'],
         ];
     }
 }

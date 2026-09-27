@@ -19,10 +19,14 @@ class StoreVendorStockRequest extends FormRequest
         // Sem `unique` em (product_id, vendedor_id): o controller faz
         // updateOrCreate (upsert), então reenviar o mesmo par atualiza o saldo
         // em vez de ser barrado — necessário pro import ser idempotente.
+        // `quantity` PODE ser negativa: o vendedor levou/vendeu mais do que
+        // recebeu e ainda tem entrega pendente (saldo devedor). Ex.: Karol
+        // vendeu 5 bandejas que ainda serão entregues -> saldo -5. Por isso
+        // sem `min:0` (antes barrava esse caso legítimo no import).
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'vendedor_id' => ['required', 'integer', 'exists:vendedores,id'],
-            'quantity' => ['required', 'integer', 'min:0'],
+            'quantity' => ['required', 'integer'],
         ];
     }
 }
