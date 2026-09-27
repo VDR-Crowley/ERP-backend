@@ -54,6 +54,9 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     // fica pra próxima etapa.
     Route::apiResource('products', ProductController::class);
     Route::apiResource('vendedores', VendedorController::class)->parameters(['vendedores' => 'vendedor']);
+
+    // CRM: compradores únicos (telefone só existe aqui). Ver CustomerController.
+    Route::apiResource('customers', \App\Http\Controllers\Api\CustomerController::class);
     Route::apiResource('flock', FlockController::class);
 
     // Galpão (plantel/local físico) — cadastro do local e do que há nele.

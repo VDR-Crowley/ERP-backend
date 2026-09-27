@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,14 @@ class SaleService
 
         return DB::transaction(function () use ($data, $skipStock) {
             $sale = Sale::create($data);
+
+            // CRM: garante que o comprador exista como customer (telefone fica
+            // null até ser preenchido no CRM). firstOrCreate respeita o unique
+            // de `name`, então reimportar/revender pro mesmo nome não duplica.
+            $buyer = trim((string) ($sale->buyer ?? ''));
+            if ($buyer !== '') {
+                Customer::firstOrCreate(['name' => $buyer]);
+            }
 
             if (! $skipStock) {
                 $this->stock->adjust(
