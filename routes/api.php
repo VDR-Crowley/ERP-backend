@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
     Route::post('feed-stocks/{feed_stock}/open-bag', [FeedStockController::class, 'openBag']);
 
     Route::get('feed-open-logs', [FeedOpenLogController::class, 'index']);
+    Route::delete('feed-open-logs/{feed_open_log}', [FeedOpenLogController::class, 'destroy']);
 
     Route::apiResource('flock-cleanings', FlockCleaningController::class);
 
