@@ -17,20 +17,29 @@ class SaleService
 {
     public function __construct(private readonly StockLocationService $stock) {}
 
-    public function create(array $data): Sale
+    /**
+     * `$skipStock`: cria a venda SEM baixar estoque. Usado no import CLEAN — o
+     * estoque da planilha já é o saldo FINAL (pós-vendas), então re-aplicar a
+     * baixa contaria em dobro (deixava product.stock/vendor_stock negativos e
+     * criava linhas de estoque de vendedor que a planilha não tem). Ver
+     * forceCreate no import.ts do front.
+     */
+    public function create(array $data, bool $skipStock = false): Sale
     {
         $data = $this->normalizeLocation($data);
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $skipStock) {
             $sale = Sale::create($data);
 
-            $this->stock->adjust(
-                $sale->stock_location_type,
-                $sale->stock_location_vendedor_id,
-                $sale->stock_location_barn_id,
-                Product::findOrFail($sale->product_id),
-                -$sale->quantity,
-            );
+            if (! $skipStock) {
+                $this->stock->adjust(
+                    $sale->stock_location_type,
+                    $sale->stock_location_vendedor_id,
+                    $sale->stock_location_barn_id,
+                    Product::findOrFail($sale->product_id),
+                    -$sale->quantity,
+                );
+            }
 
             return $sale;
         });

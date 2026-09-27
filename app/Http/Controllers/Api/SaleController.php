@@ -23,7 +23,9 @@ class SaleController extends Controller
     /** Cria a venda e baixa o estoque do produto no local informado (`stock_location_type`/`stock_location_vendedor_id`). */
     public function store(StoreSaleRequest $request): JsonResponse
     {
-        $sale = $this->sales->create($request->validated());
+        // `skip_stock` (flag do import CLEAN, fora do `validated()`): cria a venda
+        // sem baixar estoque — a planilha já traz o saldo final. Ver SaleService.
+        $sale = $this->sales->create($request->validated(), $request->boolean('skip_stock'));
 
         return response()->json($sale, Response::HTTP_CREATED);
     }
