@@ -20,6 +20,7 @@ class RestrictVendedor
         'sales.index',      // ver as vendas dele (escopadas no controller)
         'sales.store',      // criar venda (vendedor/local forçados no controller)
         'customers.index',  // ver o CRM dele (escopado no controller)
+        'customers.update', // editar o telefone dos clientes DELE (escopado no controller)
         'products.index',   // ler produtos pra montar a venda (preço/nome) + estoque do Plantel disponível
         'vendedores.index', // ler vendedores — o front resolve o nome do vendedor
                             // da venda por aqui; sem isso a lista de vendas nem carrega

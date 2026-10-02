@@ -74,6 +74,21 @@ class CustomerController extends Controller
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
     {
+        $user = $request->user();
+
+        // Perfil VENDEDOR: só edita o TELEFONE, e só de cliente que comprou DELE
+        // (não renomeia nem mexe em cliente de outro). Admin edita tudo.
+        if ($user->isVendedor()) {
+            $ehClienteDele = Sale::where('seller_id', $user->vendedor_id)
+                ->where('buyer', $customer->name)
+                ->exists();
+            abort_unless($ehClienteDele, 403, 'Esse cliente não é seu.');
+
+            $customer->update(['phone' => $request->validated()['phone'] ?? null]);
+
+            return response()->json($customer);
+        }
+
         $customer->update($request->validated());
 
         return response()->json($customer);
