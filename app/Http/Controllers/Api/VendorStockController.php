@@ -7,12 +7,19 @@ use App\Http\Requests\VendorStock\StoreVendorStockRequest;
 use App\Http\Requests\VendorStock\UpdateVendorStockRequest;
 use App\Models\VendorStock;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class VendorStockController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        // Perfil VENDEDOR: só o estoque DELE (saldo +/- por produto).
+        $user = $request->user();
+        if ($user->isVendedor()) {
+            return response()->json(VendorStock::where('vendedor_id', $user->vendedor_id)->get());
+        }
+
         return response()->json(VendorStock::all());
     }
 

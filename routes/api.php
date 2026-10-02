@@ -41,7 +41,7 @@ Route::post('/refresh', [RefreshTokenController::class, 'store'])
 
 // Rotas normais da API: exigem token com ability `access` (um refresh token
 // vazando não serve pra nada além de chamar /refresh).
-Route::middleware(['auth:sanctum', 'abilities:access'])->group(function () {
+Route::middleware(['auth:sanctum', 'abilities:access', 'restrict.vendedor'])->group(function () {
     Route::get('/user', [UserController::class, 'show']);
     Route::post('/logout', [LogoutController::class, 'store']);
 

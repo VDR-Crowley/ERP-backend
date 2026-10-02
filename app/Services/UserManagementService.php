@@ -32,11 +32,15 @@ class UserManagementService
      */
     public function create(array $data): User
     {
+        $role = $data['role'] ?? User::ROLE_ADMINISTRADOR;
+
         return User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $data['password'],
-            'role' => User::ROLE_ADMINISTRADOR,
+            'role' => $role,
+            // Só VENDEDOR carrega vendedor_id; admin sempre null.
+            'vendedor_id' => $role === User::ROLE_VENDEDOR ? ($data['vendedor_id'] ?? null) : null,
             'is_active' => true,
         ]);
     }

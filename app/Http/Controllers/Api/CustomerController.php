@@ -6,13 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\StoreCustomerRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class CustomerController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        // Perfil VENDEDOR: só os clientes que compraram DELE (buyers das vendas
+        // dele). O histórico/telefone desses clientes é tudo que ele enxerga.
+        $user = $request->user();
+        if ($user->isVendedor()) {
+            $compradores = Sale::where('seller_id', $user->vendedor_id)
+                ->whereNotNull('buyer')
+                ->where('buyer', '<>', '')
+                ->distinct()
+                ->pluck('buyer');
+
+            return response()->json(Customer::whereIn('name', $compradores)->get());
+        }
+
         return response()->json(Customer::all());
     }
 
