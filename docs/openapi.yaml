@@ -50,6 +50,8 @@ tags:
     description: Registros de limpeza do plantel
   - name: BusinessLineReport
     description: Relatório de Análise por Linha de Negócio (codorna x galinha)
+  - name: Admin
+    description: Rotas só de role `ADMINISTRADOR` (qualquer outra role → 403)
 
 paths:
   /register:
@@ -1954,6 +1956,81 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
 
+  /admin/railway-usage:
+    get:
+      tags: [Admin]
+      summary: Consumo e custo do Railway no ciclo de cobrança atual
+      description: >
+        Só `ADMINISTRADOR`. Consulta a Railway Public API (GraphQL,
+        `usage` agrupado por serviço + `estimatedUsage`) e calcula o custo em
+        US$ com os preços de `config/services.php` (`services.railway.prices_usd`).
+        O valor é uma estimativa: a fatura oficial é a do painel da Railway.
+        Resposta em cache por `RAILWAY_USAGE_CACHE_SECONDS` (default 300s);
+        `?fresh=1` ignora o cache. Limite de 30 req/min por usuário.
+        Exige `RAILWAY_API_TOKEN` (token de conta/workspace) e
+        `RAILWAY_PROJECT_ID` (injetado pelo Railway em produção) — sem eles
+        responde 503 explicando o que configurar.
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: fresh
+          in: query
+          required: false
+          description: "`1` pra ignorar o cache e consultar a Railway agora"
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Consumo do ciclo atual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RailwayUsage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Usuário não é `ADMINISTRADOR`, ou token sem ability `access`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Limite de 30 requisições por minuto excedido
+        '502':
+          description: >
+            Falha na Railway API (token recusado, erro GraphQL, rede). O token
+            nunca é devolvido na resposta.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A Railway recusou o RAILWAY_API_TOKEN (inválido, expirado ou sem acesso ao projeto).
+                  configured:
+                    type: boolean
+                    example: true
+        '503':
+          description: Integração não configurada (falta variável de ambiente)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Integração com a Railway não configurada: falta RAILWAY_API_TOKEN."
+                  configured:
+                    type: boolean
+                    example: false
+                  missing:
+                    type: array
+                    items:
+                      type: string
+                      enum: [RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID]
+                  how_to_fix:
+                    type: string
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2088,6 +2165,71 @@ components:
             $ref: '#/components/schemas/ValidationErrorResponse'
 
   schemas:
+    RailwayUsageMeasures:
+      type: object
+      description: Consumo bruto, na unidade indicada no nome do campo
+      properties:
+        cpu_vcpu_minutes: {type: number, example: 0.0977}
+        memory_gb_minutes: {type: number, example: 6.37}
+        network_egress_gb: {type: number, example: 0.0004}
+        volume_gb_minutes: {type: number, example: 120.5}
+        backup_gb_minutes: {type: number, example: 0}
+    RailwayUsage:
+      type: object
+      properties:
+        project:
+          type: object
+          properties:
+            id: {type: string}
+            name:
+              type: string
+              nullable: true
+              description: "`null` se o token não puder ler os dados do projeto"
+        period:
+          type: string
+          enum: [current_billing_cycle]
+        currency:
+          type: string
+          enum: [USD]
+        plan_credit_usd:
+          type: number
+          description: Crédito mensal do plano (`RAILWAY_PLAN_CREDIT_USD`, default 1 = Free)
+          example: 1
+        totals:
+          type: object
+          properties:
+            current_cost_usd: {type: number, example: 0.0123}
+            estimated_cycle_end_cost_usd: {type: number, example: 0.0501}
+            credit_used_percent: {type: number, nullable: true, example: 1.23}
+            estimated_credit_used_percent: {type: number, nullable: true, example: 5.01}
+        services:
+          type: array
+          description: Ordenado do mais caro pro mais barato
+          items:
+            type: object
+            properties:
+              service_id: {type: string, nullable: true}
+              name:
+                type: string
+                description: Nome do serviço no Railway (ou o ID, se o nome não puder ser lido)
+                example: Postgres
+              usage:
+                $ref: '#/components/schemas/RailwayUsageMeasures'
+              cost_usd: {type: number, example: 0.0042}
+        estimated_usage:
+          $ref: '#/components/schemas/RailwayUsageMeasures'
+        prices_usd:
+          type: object
+          properties:
+            cpu_vcpu_minute: {type: number, example: 0.000463}
+            memory_gb_minute: {type: number, example: 0.000231}
+            network_egress_gb: {type: number, example: 0.05}
+            volume_gb_minute: {type: number, example: 0.00000347}
+            backup_gb_minute: {type: number, example: 0.00000347}
+        note: {type: string}
+        fetched_at: {type: string, format: date-time}
+        configured: {type: boolean, example: true}
+        cached: {type: boolean, description: "`true` se veio do cache"}
     RegisterRequest:
       type: object
       required: [name, email, password, password_confirmation]

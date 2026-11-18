@@ -95,4 +95,11 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'restrict.vendedor'])->gr
     Route::apiResource('flock-cleanings', FlockCleaningController::class);
 
     Route::get('business-line-report', [BusinessLineReportController::class, 'show']);
+
+    // Área só de ADMINISTRADOR. Consumo/custo do Railway (crédito do plano).
+    Route::prefix('admin')->middleware('admin')->group(function () {
+        Route::get('railway-usage', \App\Http\Controllers\Api\Admin\RailwayUsageController::class)
+            ->middleware('throttle:30,1')
+            ->name('admin.railway-usage');
+    });
 });
