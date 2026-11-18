@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuthenticateMcpHttp;
+use App\Http\Middleware\EnsureAdministrador;
 use App\Http\Middleware\RestrictVendedor;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckForAnyAbility::class,
             'mcp.http-token' => AuthenticateMcpHttp::class,
             'restrict.vendedor' => RestrictVendedor::class,
+            'admin' => EnsureAdministrador::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

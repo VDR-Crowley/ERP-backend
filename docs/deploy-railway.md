@@ -176,6 +176,7 @@ Baseado no `.env.example` real do projeto:
 | `LOG_CHANNEL` | `stderr` | filesystem do Railway é efêmero, log em arquivo se perde |
 | `LOG_STDERR_FORMATTER` | `\Monolog\Formatter\JsonFormatter` | log estruturado em JSON no stderr |
 | `CORS_ALLOWED_ORIGINS` | domínio real do ERP-front em produção | hoje aponta pro dev local (`http://localhost:4200,http://localhost:4201`); trocar quando o front também for hospedado |
+| `RAILWAY_API_TOKEN` | token de conta/workspace (railway.com/account/tokens) | opcional, só App. Alimenta a tela admin `GET /api/admin/railway-usage`; sem ele a rota responde 503 explicando o que falta. `RAILWAY_PROJECT_ID` o Railway já injeta sozinho. Crédito do plano em `RAILWAY_PLAN_CREDIT_USD` (default 1 = Free) |
 
 Todas as demais variáveis do `.env.example` (`SESSION_*`, `CACHE_STORE`,
 `MAIL_*`, `BCRYPT_ROUNDS`, etc.) podem manter os defaults ou serem ajustadas
